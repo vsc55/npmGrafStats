@@ -1,29 +1,30 @@
 #!/bin/bash
+
 echo "npmGrafStats: v2.4.3"
 echo "Startup: lets get the logs send them to influx"
 
+NPMGRAF_DIR="/root/.config/NPMGRAF"
 
-if [ "$REDIRECTION_LOGS" = "TRUE" ]
-then
+_REDIRECTION_LOGS="${REDIRECTION_LOGS:-}"
+_REDIRECTION_LOGS="${_REDIRECTION_LOGS,,}"
+
+case "$_REDIRECTION_LOGS" in
+  true)
     echo "Redirection and Reverse-Proxy Logs activated"
-    bash /root/.config/NPMGRAF/sendips.sh &
-    bash /root/.config/NPMGRAF/sendredirectionips.sh &
-
-elif [ "$REDIRECTION_LOGS" = "ONLY" ]
-then
+    bash "${NPMGRAF_DIR}/sendips.sh" &
+    bash "${NPMGRAF_DIR}/sendredirectionips.sh" &
+    ;;
+  only)
     echo "Only Redirection Logs activated"
-    bash /root/.config/NPMGRAF/sendredirectionips.sh
-
-else
+    bash "${NPMGRAF_DIR}/sendredirectionips.sh" &
+    ;;
+  *)
     echo "Only Reverse-Proxy Logs activated"
-    bash /root/.config/NPMGRAF/sendips.sh
-fi
+    bash "${NPMGRAF_DIR}/sendips.sh" &
+    ;;
+esac
 
 sleep 0.5
-# reads from standard input and writes to standard output and in file
-tee /root/.config/NPMGRAF/nohup.out > /proc/1/fd/1 2>/proc/1/fd/2
 
-# Wait for any process to exit
-wait -n
-# Exit with status of process that exited first
-exit $?
+# Defined tee as the main process for docker and redirect logs to standard output
+exec tee "${NPMGRAF_DIR}/nohup.out" > /proc/1/fd/1 2>/proc/1/fd/2
