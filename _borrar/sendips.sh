@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Get Reverse Proxy-host logs
 
 # To better understand the collection with regular expression
 # {1,3} get one to three characters. [0-9] character from 0 to 9. \ for special characters. () grouping as an expression. | or
@@ -53,6 +52,15 @@ extract_nth_ip() {
     grep -o -E "$IP_REGEX" <<< "$line" | sed -n "${n}p"
 }
 
+
+
+
+
+
+
+
+
+
 # gets all lines including an IP. 
 # Grep finds the the IP addresses in the access.log
 process_logfile()
@@ -73,7 +81,7 @@ process_logfile()
 
         # What does outsideip say?
         # [ -z "$outsideip" ] && continue
-        
+
 
         # head -2 and tail -1 because grep finds two (sometimes three) and only the second is needed
         targetip=$(extract_nth_ip 2 "$line")
@@ -119,6 +127,7 @@ process_logfile()
         fi
     done
 }
+
 
 shopt -s nullglob
 for logfile in /logs/proxy-host-*_access.log; do

@@ -5,10 +5,10 @@ echo "Startup: lets get the logs send them to influx"
 
 NPMGRAF_DIR="/root/.config/NPMGRAF"
 
-_REDIRECTION_LOGS="${REDIRECTION_LOGS:-}"
-_REDIRECTION_LOGS="${_REDIRECTION_LOGS,,}"
+REDIRECTION_LOGS="${REDIRECTION_LOGS:-TRUE}"
+REDIRECTION_LOGS="${REDIRECTION_LOGS,,}"
 
-case "$_REDIRECTION_LOGS" in
+case "$REDIRECTION_LOGS" in
   true)
     echo "Redirection and Reverse-Proxy Logs activated"
     bash "${NPMGRAF_DIR}/sendips.sh" &

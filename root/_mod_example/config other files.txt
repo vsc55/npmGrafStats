@@ -1,0 +1,32 @@
+config/__init__.py
+
+In the Start file:
+
+if TYPE_CHECKING:
+    from mod_example.config import ModExampleConfig
+    from mod_example.logtasks import get_log_tasks as examplemod_get_log_tasks
+
+
+@dataclass(frozen=True)
+class GlobalConfig:
+    ...
+    npm: Optional["NpmConfig"] = None
+    mod_example: Optional["ModExampleConfig"] = None  # 👈 New
+    ...
+
+
+    @classmethod
+    def build(cls) -> "GlobalConfig":
+        ...
+        # --- ExampleMod ---
+        try:
+            from mod_example.config import ModExampleConfig
+            from mod_example.logtasks import get_log_tasks as examplemod_get_log_tasks
+
+            object.__setattr__(newcfg, "mod_example", ModExampleConfig(newcfg))
+            newcfg._log_providers.append(examplemod_get_log_tasks)
+
+        except ImportError:
+            # If the modue 
+            pass
+        ...
