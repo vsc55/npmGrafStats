@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Tests for logwatcher module."""
 import time
 import threading
 from pathlib import Path

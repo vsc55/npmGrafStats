@@ -8,7 +8,7 @@ from enum import Enum
 from config import cfg, LogMode, TypeRegex
 from utils import debug_msg, is_ip_in_range, format_time
 from connector.influx_client import InfluxRecord
-from api.external.abuseipdb import check_abuseipdb, is_abuseipdb_key_configured
+from api.external.abuseipdb import AbuseIPDB, AbuseIPDBStatusReturn
 from api.external.geoip2 import get_city, get_asn
 
 LogKind = Literal["proxy", "redirection"]
@@ -148,9 +148,6 @@ def _parse_send_record(
             pass
 
         case TypeSendRecord.PUBLIC:
-            new_entres = {}
-
-
             geo_data = get_city(ip)
             geo_entries  = {
                 "key": geo_data.get("iso_code", ""),
@@ -173,18 +170,15 @@ def _parse_send_record(
                     tags["Asn"] = asn_data
                     fields["Asn"] = asn_data
 
-            if is_abuseipdb_key_configured():
-                abuse_data = check_abuseipdb(ip) or {}
-                if abuse_data:
-                    abuse_entries = {
-                        "abuseConfidenceScore": abuse_data.get("abuseConfidenceScore"),
-                        "totalReports": abuse_data.get("totalReports"),
-                    }
-                    tags.update(abuse_entries)
-                    fields.update(abuse_entries)
+            abuse_result = AbuseIPDB.check(ip, key=cfg.api_abuseip_key, debug=cfg.debug, show=True)
+            if abuse_result["status"] is AbuseIPDBStatusReturn.SUCCESS:
+                abuse_entries = {
+                    "abuseConfidenceScore": abuse_result["data"].get("abuseConfidenceScore") or 0,
+                    "totalReports": abuse_result["data"].get("totalReports") or 0,
+                }
+                tags.update(abuse_entries)
+                fields.update(abuse_entries)
 
-            tags.update(new_entres)
-            fields.update(new_entres)
         case _:
             pass
 
@@ -310,7 +304,7 @@ def handle_line(line: str, mode: LogKind) -> list[InfluxRecord]:
         else:
             print(f"[{mode}] Unknown mode, skipping line", file=sys.stderr, flush=True)
             return records
-        
+
         debug_msg(f"[{mode}] Normal connection: {outside_ip} -> {domain}")
         send_type = TypeSendRecord.PUBLIC
         send_record = {

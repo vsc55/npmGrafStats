@@ -119,3 +119,4 @@ docker-compose.override.yml
 *.swp
 *.tmp
 *.old
+.env.dev

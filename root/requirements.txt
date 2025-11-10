@@ -3,3 +3,4 @@ geoip2
 influxdb-client
 # pytest
 # pytest-mock
+# pytest-env

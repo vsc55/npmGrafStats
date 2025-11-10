@@ -111,7 +111,7 @@ class Regex:
 class GlobalConfig:
     """ Global configuration """
     # -------- General settings --------
-    debug: bool = True
+    debug: bool = False
 
     # -------- Application version --------
     @property
@@ -162,12 +162,10 @@ class GlobalConfig:
     monitoring_logs: LogMode = LogMode.FALSE
 
     # -------- External IP detection --------
-    _external_ip: ExternalIP = field(init=False, repr=False, default=None)
+    _external_ip: ExternalIP = field(default_factory=ExternalIP, init=False, repr=False)
     @property
     def external_ip(self) -> str:
         """ Get the external IP of the machine. """
-        if self._external_ip is None:
-            object.__setattr__(self, "_external_ip", ExternalIP())
         try:
             return self._external_ip.get_ip() or ""
 
@@ -212,6 +210,10 @@ class GlobalConfig:
     def lock(self):
         """Lock the config after initialization."""
         self._locked = True
+
+    def unlock(self):
+        """Unlock the config for modifications."""
+        self._locked = False
 
     @classmethod
     def build(cls) -> "GlobalConfig":
