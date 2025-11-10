@@ -17,6 +17,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # --- TESTS PYTHON ANTES DEL DOCKER ---
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install Python dependencies
+        working-directory: root
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-mock
+
+      - name: Run unit tests
+        working-directory: root
+        run: pytest -q
+
+      # --- DOCKER BUILD / PUSH ---
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         
