@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import importlib
 import dataclasses
 from dataclasses import dataclass, field
 from typing import Optional, Callable, Iterable, TYPE_CHECKING, Any
@@ -13,12 +14,11 @@ from utils.external_ip import ExternalIP
 
 if TYPE_CHECKING:
     from npm.config import NpmConfig
-    from npm.logtasks import get_log_tasks
     from logwatcher import LogTask
 else:
     LogTask = Any # Dummy type for LogTask when not type checking
 
-LogTasksProvider = Callable[[], Iterable[LogTask]]
+LogTasksProviderRef = tuple[str, str]  # (module, function_name)
 
 class LogMode(str, Enum):
     """ Enumeration for log modes. """
@@ -111,7 +111,7 @@ class Regex:
 class GlobalConfig:
     """ Global configuration """
     # -------- General settings --------
-    debug: bool = False
+    debug: bool = True
 
     # -------- Application version --------
     @property
@@ -182,17 +182,19 @@ class GlobalConfig:
     # in the future: apache: Optional["ApacheConfig"] = None, etc.
 
     # ------- Log tasks providers --------
-    _log_providers: list[LogTasksProvider] = field(default_factory=list)
+    _log_providers: list[LogTasksProviderRef] = field(default_factory=list)
 
-    def register_log_tasks_provider(self, provider: LogTasksProvider) -> None:
+    def register_log_tasks_provider(self, module: str, func: str) -> None:
         """ Register a log tasks provider. """
-        self._log_providers.append(provider)
+        self._log_providers.append((module, func))
 
     @property
     def all_log_tasks(self) -> list[LogTask]:
         """ Get all log tasks from registered providers. """
-        tasks: list[LogTask] = []
-        for provider in self._log_providers:
+        tasks: list["LogTask"] = []
+        for module_name, func_name in self._log_providers:
+            mod = importlib.import_module(module_name)
+            provider = getattr(mod, func_name)
             tasks.extend(provider())
         return tasks
 
@@ -230,10 +232,8 @@ class GlobalConfig:
 
         try:
             from npm.config import NpmConfig # pylint: disable=import-outside-toplevel
-            from npm.logtasks import get_log_tasks as npm_get_log_tasks # pylint: disable=import-outside-toplevel
             newcfg.npm = NpmConfig(newcfg)
-            # newcfg.register_log_tasks_provider(npm_get_log_tasks)
-            newcfg._log_providers.append(npm_get_log_tasks)
+            newcfg.register_log_tasks_provider("npm.logtasks", "get_log_tasks")
 
         except ImportError as e:
             raise ImportError("Failed to import npm module for configuration.") from e

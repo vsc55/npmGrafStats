@@ -74,6 +74,10 @@ def watch_logs(task: LogTask, stop_event: threading.Event) -> None:
     processor = task.processor
 
     while not stop_event.is_set():
+        if cfg.debug:
+            print(f"[{description}] Scanning for log files matching: {pattern}", flush=True)
+            print(f"[{description}] Already following: {len(started)} files", flush=True)
+
         for path in sorted(glob.glob(pattern)):
             if path in started:
                 if cfg.debug:

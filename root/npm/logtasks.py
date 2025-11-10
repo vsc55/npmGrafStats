@@ -3,9 +3,10 @@
 from __future__ import annotations
 from typing import Iterable
 
-from config import LogMode
+from config import LogMode, cfg
 from logwatcher import LogTask, LineProcessor
 from npm.handlers import handle_line, LogKind
+from npm.config import LogsPaths
 from connector.influx_client import InfluxRecord
 
 def make_processor(mode: LogKind) -> LineProcessor:
@@ -19,15 +20,13 @@ def get_log_tasks() -> Iterable[LogTask]:
     Returns the log tasks that NPM wants to run,
     based on the global configuration.
     """
-    from config import cfg  # pylint: disable=import-outside-toplevel
-
     tasks: list[LogTask] = []
 
     # Reverse Proxy logs
     if cfg.redirection_logs in (LogMode.TRUE, LogMode.FALSE):
         tasks.append(
             LogTask(
-                pattern=cfg.npm.proxy_log_pattern,
+                pattern=cfg.npm.get_path(LogsPaths.PROXY),
                 description="proxy",
                 processor=make_processor("proxy"),
             )
@@ -37,7 +36,7 @@ def get_log_tasks() -> Iterable[LogTask]:
     if cfg.redirection_logs in (LogMode.TRUE, LogMode.ONLY):
         tasks.append(
             LogTask(
-                pattern=cfg.npm.redir_log_pattern,
+                pattern=cfg.npm.get_path(LogsPaths.REDIRECTION),
                 description="redirection",
                 processor=make_processor("redirection"),
             )

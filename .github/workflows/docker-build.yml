@@ -2,7 +2,7 @@ name: Build and Publish Docker Image
 
 on:
   push:
-    branches: [ "main" ]      # Only build on main branch
+    branches: [ "python" ]      # Only build on python branch
     tags: [ "v*" ]            # If the push is a tag like v1.2.3 → publish
   pull_request:
 
