@@ -7,6 +7,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TypedDict, Any
 import requests
+from api.external.abuseipdb.exceptions import (
+    AbuseIPDBConfigError,
+    AbuseIPDBNetworkError,
+    AbuseIPDBResponseError
+)
 
 class AbuseIPDBResult(TypedDict, total=False):
     """ Structured result for AbuseIPDB checks. """
@@ -230,120 +235,106 @@ class AbuseIPDB:
     def api_check(self) -> AbuseIPDBResult:
         """ 
         Check the IP address against AbuseIPDB.
+
         Returns:
             AbuseIPDBResult: Structured result with status, codes, data and errors.
+                             Only SUCCESS and WARNING statuses are returned here;
+                             ERROR status is raised as exceptions.
 
-            Error Codes:
-            -1 : API key is missing
-            -2 : IP address is missing
-            -3 : Network error during request
-            -4 : JSON decode error during request
-            -5 : Unexpected error during request
+        Raises:
+            AbuseIPDBConfigError: Missing configuration (API key, IP address).
+            AbuseIPDBNetworkError: Error during network request (timeout, DNS, etc.).
+            AbuseIPDBResponseError: Invalid response from API (HTTP error, invalid JSON, etc.).
         """
         result : AbuseIPDBResult = self.base_result()
 
         if not self.is_key_set:
-            result['status'] = AbuseIPDBStatusReturn.ERROR
-            result['status_code'] = -1
-            result['error_message'] = 'AbuseIPDB API key is required'
+            raise AbuseIPDBConfigError("AbuseIPDB API key is required")
 
-        elif not self.is_ip_set:
-            result['status'] = AbuseIPDBStatusReturn.ERROR
-            result['status_code'] = -2
-            result['error_message'] = 'IP address is required'
+        if not self.is_ip_set:
+            raise AbuseIPDBConfigError("IP address is required")
 
         response: requests.Response | None = None
-        response_json: dict[str, Any] = {}
-        if result['status'] != AbuseIPDBStatusReturn.ERROR:
-            try:
-                response = requests.request(
-                    method = 'GET',
-                    url = self.url,
-                    headers ={
-                        'Accept': 'application/json',
-                        'Key': self.key
-                    },
-                    params = {
-                        'ipAddress': self.ip,
-                        'maxAgeInDays': str(self.max_age_in_days),
-                        # Only include if verbose is True
-                        **({'verbose': ''} if self.verbose else {})
-                    },
-                    timeout = self.timeout
+        try:
+            response = requests.request(
+                method = 'GET',
+                url = self.url,
+                headers ={
+                    'Accept': 'application/json',
+                    'Key': self.key
+                },
+                params = {
+                    'ipAddress': self.ip,
+                    'maxAgeInDays': str(self.max_age_in_days),
+                    # Only include if verbose is True
+                    **({'verbose': ''} if self.verbose else {})
+                },
+                timeout = self.timeout
+            )
+
+        except requests.RequestException as re:
+            if self.show:
+                print(
+                    f"[Error] AbuseIPDB request exception for {self.ip}: {re}",
+                    flush=True
                 )
-                response_json = response.json()
+            raise AbuseIPDBNetworkError("Network error calling AbuseIPDB", original=re) from re
 
-            except requests.RequestException as re:
-                result['status'] = AbuseIPDBStatusReturn.ERROR
-                result['status_code'] = -3
-                result['error_message'] = f"Network error calling AbuseIPDB: {re}"
-                if self.show:
-                    print(
-                        f"[Error] AbuseIPDB request exception for {self.ip}: {str(re)}",
-                        flush=True
-                    )
+        response_json: dict[str, Any] = {}
+        try:
+            response_json = response.json()
 
-            except json.JSONDecodeError as je:
-                result['status'] = AbuseIPDBStatusReturn.ERROR
-                result['status_code'] = -4
-                result['error_message'] = f"Invalid JSON response from AbuseIPDB: {je}"
-                if self.show:
-                    print(
-                        f"[Error] AbuseIPDB JSON decode error for {self.ip}: {str(je)}",
-                        flush=True
-                    )
+        except json.JSONDecodeError as je:
+            if self.show:
+                print(
+                    f"[Error] AbuseIPDB JSON decode error for {self.ip}: {je}",
+                    flush=True
+                )
+            raise AbuseIPDBResponseError(
+                "Invalid JSON response from AbuseIPDB",
+                status_code=response.status_code,
+            ) from je
 
-            except Exception as e: # pylint: disable=broad-except
-                result['status'] = AbuseIPDBStatusReturn.ERROR
-                result['status_code'] = -5
-                result['error_message'] = f"Unexpected error calling AbuseIPDB: {e}"
-                if self.show:
-                    print(
-                        f"[Error] AbuseIPDB unexpected error for {self.ip}: {str(e)}",
-                        flush=True
-                    )
+        errors = response_json.get("errors", []) or []
+        data = response_json.get("data", {}) or {}
 
-        if result['status'] != AbuseIPDBStatusReturn.ERROR and response is not None:
-            result['status_code'] = response.status_code
-            result['errors'] = response_json.get("errors", []) or []
-            result['data'] = response_json.get("data", {}) or {}
+        if response.status_code != 200:
+            if self.show:
+                print(
+                    f"[Error] AbuseIPDB request for {self.ip}: {response.status_code}",
+                    flush=True
+                )
+                for err in errors:
+                    detail = err.get("detail", "No detail provided")
+                    print(f"  [AbuseIPDB Error] {detail}", flush=True)
 
-            if response.status_code == 200:
-                result['status'] = AbuseIPDBStatusReturn.SUCCESS
+            raise AbuseIPDBResponseError(
+                "AbuseIPDB request failed",
+                status_code=response.status_code,
+                api_errors=errors,
+            )
 
-                if not result["data"]:
-                    result['status'] = AbuseIPDBStatusReturn.WARNING
-                    result['error_message'] = 'No data returned from AbuseIPDB'
-                    if self.show:
-                        print(f"[Warning] AbuseIPDB returned no data for {self.ip}", flush=True)
+        # status_code == 200 → SUCCESS o WARNING
+        result: AbuseIPDBResult = self.base_result(AbuseIPDBStatusReturn.SUCCESS)
+        result["status_code"] = response.status_code
+        result["data"] = data
+        result["errors"] = errors
 
-            else:
-                result['status'] = AbuseIPDBStatusReturn.ERROR
-                result['error_message'] = 'AbuseIPDB request failed'
-                if self.show:
-                    print(
-                        f"[Error] AbuseIPDB request for {self.ip}: {response.status_code}",
-                        flush=True
-                    )
-
-                for error in result["errors"]:
-                    err_detail = error.get("detail", "No detail provided")
-                    err_status = error.get("status", "Unknown")
-                    result['error_message'] += f" (Status {err_status}: {err_detail})"
-                    if self.show:
-                        print(f"  [AbuseIPDB Error] {err_detail}", flush=True)
+        if not data:
+            result["status"] = AbuseIPDBStatusReturn.WARNING
+            result["error_message"] = "No data returned from AbuseIPDB"
+            if self.show:
+                print(f"[Warning] AbuseIPDB returned no data for {self.ip}", flush=True)
 
         if self.debug:
-            debug_result = {
-                **result,
-                "status": result["status"].name
-                if isinstance(result["status"], AbuseIPDBStatusReturn)
-                else result["status"]
-            }
+            debug_result = dict(result)
+            if isinstance(debug_result.get("status"), AbuseIPDBStatusReturn):
+                debug_result["status"] = debug_result["status"].name
             print(json.dumps(debug_result, indent=4, sort_keys=True), flush=True)
 
         self._last_result = result
         return result
+
 
     @staticmethod
     def check(ip: str, key: str, debug: bool = False, show: bool = True) -> AbuseIPDBResult:
@@ -358,14 +349,16 @@ class AbuseIPDB:
             AbuseIPDBResult: Structured result with status, codes, data and errors.
 
             Error Codes:
-            -1  : API key is missing
-            -2  : IP address is missing
-            -3  : Network error during request
-            -4  : JSON decode error during request
-            -5  : Unexpected error during request
+            -1  : Configuration error (missing API key, missing IP, etc.)
+            -2  : Network error during request
+            -3  : API response error (HTTP error, invalid JSON, etc.)
             -20 : Invalid IP address format
         """
         abuseipdb = AbuseIPDB()
+        abuseipdb.key = key
+        abuseipdb.debug = debug
+        abuseipdb.show = show
+
         try:
             abuseipdb.ip = ip
         except ValueError as ve:
@@ -374,10 +367,27 @@ class AbuseIPDB:
             base['error_message'] = str(ve)
             return base
 
-        abuseipdb.key = key
-        abuseipdb.debug = debug
-        abuseipdb.show = show
-        return abuseipdb.api_check()
+        try:
+            return abuseipdb.api_check()
+
+        except AbuseIPDBConfigError as e:
+            base = abuseipdb.base_result(AbuseIPDBStatusReturn.ERROR)
+            base["status_code"] = -1
+            base["error_message"] = str(e)
+            return base
+
+        except AbuseIPDBNetworkError as e:
+            base = abuseipdb.base_result(AbuseIPDBStatusReturn.ERROR)
+            base["status_code"] = -2
+            base["error_message"] = str(e)
+            return base
+
+        except AbuseIPDBResponseError as e:
+            base = abuseipdb.base_result(AbuseIPDBStatusReturn.ERROR)
+            base["status_code"] = e.status_code or -3
+            base["error_message"] = str(e)
+            base["errors"] = e.api_errors
+            return base
 
     @staticmethod
     def checks(
@@ -394,11 +404,9 @@ class AbuseIPDB:
             list[AbuseIPDBResult]: List of structured results for each IP.
 
             Error Codes:
-            -1  : API key is missing
-            -2  : IP address is missing
-            -3  : Network error during request
-            -4  : JSON decode error during request
-            -5  : Unexpected error during request
+            -1  : Configuration error (missing API key, missing IP, etc.)
+            -2  : Network error during request
+            -3  : API response error (HTTP error, invalid JSON, etc.)
             -20 : Invalid IP address format
         """
         results: list[AbuseIPDBResult] = []
