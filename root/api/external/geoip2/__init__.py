@@ -149,7 +149,7 @@ class GeoIP2Client:
         self._show = value
 
     # ---- Base Structures ----
-    def _base_city(self, ip: str = None, status: str = "fail") -> GeoIP2CityResult:
+    def _base_city(self, status: str = "fail") -> GeoIP2CityResult:
         """Get base structure for City result."""
         return {
             "country": "",
@@ -159,7 +159,7 @@ class GeoIP2Client:
             "latitude": "",
             "longitude": "",
             "iso_code": "",
-            "ip": ip or self.ip,
+            "ip": "",
             "status": status,
         }
 
@@ -237,6 +237,7 @@ class GeoIP2Client:
                 geo_info["latitude"] = str(data_city.location.latitude or "")
                 geo_info["longitude"] = str(data_city.location.longitude or "")
                 geo_info["iso_code"] = data_city.country.iso_code or ""
+                geo_info["ip"] = self.ip
                 geo_info["status"] = "success"
 
         except ValueError as ve:
@@ -291,6 +292,26 @@ class GeoIP2Client:
         client.show = show
         return client.city()
 
+
+    @staticmethod
+    def get_citys(
+        ips: list[str], db: str, *, debug: bool = False, show: bool = True
+    ) -> dict[str, GeoIP2CityResult]:
+        """ Get GeoIP2 City information for a list of IP addresses. """
+        results: dict[str, GeoIP2CityResult] = {}
+        client = GeoIP2Client()
+        client.city_db_path = db
+        client.debug = debug
+        client.show = show
+
+        for ip in ips:
+            client.ip = ip
+            result = client.city()
+            results[ip] = result
+
+        return results
+
+
     @staticmethod
     def get_asn(
         ip: str, db: str, *, debug: bool = False, show: bool = True
@@ -302,3 +323,21 @@ class GeoIP2Client:
         client.debug = debug
         client.show = show
         return client.asn()
+
+    @staticmethod
+    def get_asns(
+        ips: list[str], db: str, *, debug: bool = False, show: bool = True
+    ) -> dict[str, GeoIP2ASNResult]:
+        """ Get ASN information for a list of IP addresses. """
+        results: dict[str, GeoIP2ASNResult] = {}
+        client = GeoIP2Client()
+        client.asn_db_path = db
+        client.debug = debug
+        client.show = show
+
+        for ip in ips:
+            client.ip = ip
+            result = client.asn()
+            results[ip] = result
+
+        return results

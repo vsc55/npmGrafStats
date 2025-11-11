@@ -9,7 +9,7 @@ from config import cfg, LogMode, TypeRegex
 from utils import debug_msg, is_ip_in_range, format_time
 from connector.influx_client import InfluxRecord
 from api.external.abuseipdb import AbuseIPDB, AbuseIPDBStatusReturn
-from api.external.geoip2 import get_city, get_asn
+from api.external.geoip2 import GeoIP2Client, GeoIP2CityResult, GeoIP2ASNResult
 
 LogKind = Literal["proxy", "redirection"]
 
@@ -148,14 +148,20 @@ def _parse_send_record(
             pass
 
         case TypeSendRecord.PUBLIC:
-            geo_data = get_city(ip)
+
+            geo_data = GeoIP2Client.get_city(
+                ip,
+                db = cfg.geo_city_db_path,
+                debug = cfg.debug,
+                show=True
+            )
             geo_entries  = {
-                "key": geo_data.get("iso_code", ""),
-                "City": geo_data.get("city", ""),
-                "State": geo_data.get("state", ""),
-                "Name": geo_data.get("country", ""),
-                "latitude": _parse_float(geo_data.get("latitude", "") or "", 0.0),
-                "longitude": _parse_float(geo_data.get("longitude", "") or "", 0.0),
+                "key": geo_data["iso_code"],
+                "City": geo_data["city"],
+                "State": geo_data["state"],
+                "Name": geo_data["country"],
+                "latitude": _parse_float(geo_data["latitude"], 0.0),
+                "longitude": _parse_float(geo_data["longitude"], 0.0),
             }
             tags.update(geo_entries)
             fields.update(geo_entries)
@@ -165,10 +171,15 @@ def _parse_send_record(
             tags["longitude"] = str(tags['longitude'])
 
             if asn_flag:
-                asn_data = get_asn(ip)
+                asn_data = GeoIP2Client.get_asn(
+                    ip,
+                    db = cfg.geo_asn_db_path,
+                    debug = cfg.debug,
+                    show=True
+                )
                 if asn_data:
-                    tags["Asn"] = asn_data
-                    fields["Asn"] = asn_data
+                    tags["Asn"] = asn_data["org"]
+                    fields["Asn"] = asn_data["org"]
 
             abuse_result = AbuseIPDB.check(ip, key=cfg.api_abuseip_key, debug=cfg.debug, show=True)
             if abuse_result["status"] is AbuseIPDBStatusReturn.SUCCESS:
@@ -236,24 +247,6 @@ def handle_line(line: str, mode: LogKind) -> list[InfluxRecord]:
                 "asn": False,
             }
 
-        #     record: SendRecord = {
-        #         "ip": outside_ip,
-        #         "domain": domain,
-        #         "length": length,
-        #         "target_ip": target_ip or "",
-        #         "asn": False
-        #     }
-        #     tags, fields = _parse_send_record(TypeSendRecord.LOCAL, record)
-        #     records.append(
-        #         InfluxRecord(
-        #             measurement="InternalRProxyIPs",
-        #             tags=tags,
-        #             fields=fields,
-        #             timestamp=measurement_time,
-        #         )
-        #     )
-        # return records
-
     # 2) IP Monitoring
     elif _is_monitoring_ip(outside_ip):
         debug_msg(f"[{mode}] An excluded monitoring service checked: {domain}")
@@ -270,24 +263,6 @@ def handle_line(line: str, mode: LogKind) -> list[InfluxRecord]:
                 "target_ip": target_ip or "",
                 "asn": True,
             }
-
-        #     record: SendRecord = {
-        #         "ip": outside_ip,
-        #         "domain": domain,
-        #         "length": length,
-        #         "target_ip": target_ip or "",
-        #         "asn": True
-        #     }
-        #     tags, fields = _parse_send_record(TypeSendRecord.PUBLIC, record)
-        #     records.append(
-        #         InfluxRecord(
-        #             measurement="MonitoringRProxyIPs",
-        #             tags=tags,
-        #             fields=fields,
-        #             timestamp=measurement_time,
-        #         )
-        #     )
-        # return records
 
     # 3) Rest of connections
     else:
@@ -314,22 +289,6 @@ def handle_line(line: str, mode: LogKind) -> list[InfluxRecord]:
             "target_ip": rec_target,
             "asn": True,
         }
-        # record: SendRecord = {
-        #     "ip": outside_ip,
-        #     "domain": domain,
-        #     "length": rec_length,
-        #     "target_ip": rec_target,
-        #     "asn": True
-        # }
-        # tags, fields = _parse_send_record(TypeSendRecord.PUBLIC, record)
-        # records.append(
-        #     InfluxRecord(
-        #         measurement=measurement,
-        #         tags=tags,
-        #         fields=fields,
-        #         timestamp=measurement_time,
-        #     )
-        # )
 
     # if measurement and send_type and send_record are set, create the InfluxRecord
     if not (measurement and send_type and send_record):
