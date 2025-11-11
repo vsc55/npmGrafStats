@@ -38,7 +38,7 @@ jobs:
       
       # Set up QEMU is needed is the compilation is not amd64
       - name: Set up QEMU
-        if: ${{ !startsWith(github.ref, 'refs/tags/test') }}
+        if: startsWith(github.ref, 'refs/tags/test')
         uses: docker/setup-qemu-action@v3
         
       - name: Set up Docker Buildx
