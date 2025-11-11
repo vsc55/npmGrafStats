@@ -4,10 +4,10 @@ FROM python:3.14-slim AS builder
 LABEL maintainer="npmgrafstats@smilebasti.myhome-server.de"
 
 # Install necessary packages for building
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#     gcc git build-essential \
-#     && apt-get clean \
-#     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc build-essential python3-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Python packages
 COPY ./root/requirements.txt /tmp/requirements.txt
