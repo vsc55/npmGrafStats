@@ -132,12 +132,26 @@ def watch_logs(
             t = threading.Thread(
                 target=follow_file,
                 args=(path, description, processor, queue, stop_event),
-                daemon=True,
+                daemon=False,
+                name=f"follow-{description}-{os.path.basename(path)}",
             )
             t.start()
             started[path] = t
 
         time.sleep(SCAN_INTERVAL)
+
+    # Stop all started follow threads
+    for path, th in list(started.items()):
+        print(
+            f"[STOP][{description}] Joining follow thread for: {path} (alive={th.is_alive()})",
+            flush=True
+        )
+        if th.is_alive():
+            th.join(timeout=5.0)
+        print(
+            f"[STOP][{description}] Follow thread finished for: {path} (alive={th.is_alive()})",
+            flush=True
+        )
 
 def start_log_tasks(
         tasks: Iterable[LogTask],
@@ -155,6 +169,7 @@ def start_log_tasks(
         target=influx_writer,
         args=(queue, stop_event, cli_influx),
         daemon=True,
+        name="influx-writer",
     )
     writer_thread.start()
     threads.append(writer_thread)
@@ -168,6 +183,7 @@ def start_log_tasks(
                 queue
             ),
             daemon=True,
+            name=f"watch-logs-{task.description}",
         )
         t.start()
         threads.append(t)

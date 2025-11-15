@@ -11,29 +11,36 @@ from connector.influx import InfluxClient
 from connector.influx.fake_server import FakeInfluxServer
 from utils import debug_msg
 
-FAKE_SERVER_INFLUX = None
+
+def stop_all(
+        stop_event: threading.Event,
+        threads: list[threading.Thread],
+        fake_server: FakeInfluxServer = None
+) -> None:
+    """Stop all log watcher threads gracefully."""
+    print("[STOP] Stopping all log threads...", flush=True)
+
+    # Signal to stop all threads
+    stop_event.set()
+
+    # Join all threads
+    for t in threads:
+        print(f"[STOP] Joining thread: {t.name} (alive={t.is_alive()})", flush=True)
+        if t.is_alive():
+            t.join()
+        print(f"[STOP] Thread finished: {t.name} (alive={t.is_alive()})", flush=True)
+
+    if fake_server is not None:
+        print("[STOP] Stopping fake InfluxDB server...", flush=True)
+        fake_server.stop()
+        print("[STOP] Fake InfluxDB server stopped.", flush=True)
+
+    print("[STOP] All threads stopped.", flush=True)
 
 
-def run() -> None:
-    """Main function to start log watchers based on configuration."""
-
-    stop_event = threading.Event()
-
-    url = cfg.influxdb['host']
-    if cfg.influxdb['host'] == "fake":
-        url = FAKE_SERVER_INFLUX.url
-
-    cli_influx = InfluxClient.create(
-        url=url,
-        org="local-org",
-        token="local-token",
-        bucket="local-bucket",
-        debug=False,
-    )
-
-    if cli_influx.test_connection():
-        debug_msg("Connected to InfluxDB successfully.")
-    else:
+def test_connection(cli_influx: InfluxClient) -> bool:
+    """Test connection to InfluxDB."""
+    if not cli_influx.test_connection():
         retry_connect = cfg.influxdb_retry_connect
         retry_count = 0
         retry_delay = cfg.influxdb_retry_delay
@@ -49,13 +56,44 @@ def run() -> None:
             time.sleep(retry_delay)
 
             if cli_influx.test_connection():
-                print("Connected to InfluxDB successfully.", flush=True)
                 break
 
         if cli_influx.is_available() is False:
-            print("Failed to connect to InfluxDB after retries, exiting...", flush=True)
-            return 1
+            raise ValueError("Failed to connect to InfluxDB after retries")
 
+    return True
+
+def run() -> None:
+    """Main function to start log watchers based on configuration."""
+
+    url = cfg.influxdb['host']
+
+    fake_server = None
+    if url == "fake":
+        debug_mode = os.getenv(
+            "DEBUG_SERVER_INFLUX_FAKE", str(cfg.debug)
+        ).lower() in ("1", "true", "yes", "on")
+        fake_server = FakeInfluxServer(debug=debug_mode)
+        fake_server.start()
+        url = fake_server.url
+
+    stop_event = threading.Event()
+
+    cli_influx = InfluxClient.create(
+        url=url,
+        org=cfg.influxdb['org'],
+        token=cfg.influxdb['token'],
+        bucket=cfg.influxdb['bucket'],
+        debug=cfg.debug
+    )
+
+    try:
+        test_connection(cli_influx)
+        debug_msg("Connected to InfluxDB successfully.")
+
+    except ValueError as e:
+        print(f"{e}, exiting...", flush=True)
+        return 1
 
     # Get log tasks from npm module or other sources
     tasks = cfg.all_log_tasks
@@ -72,20 +110,27 @@ def run() -> None:
         print("No log watcher threads started.", flush=True)
         return 0
 
+    exit_code = 0
     try:
         while True:
             time.sleep(60)
+            # Simulate StopAll
+            # raise KeyboardInterrupt
 
-    except (SystemExit, KeyboardInterrupt):
-        stop_event.set()
-        print("Stopping log collector...", flush=True)
+    except KeyboardInterrupt:
+        exit_code = 0
+
+    except SystemExit as e:
+        exit_code = e.code if e.code is not None else 0
 
     except Exception as e:  # pylint: disable=broad-exception-caught
-        stop_event.set()
         print(f"Error in main loop: {e}", file=sys.stderr, flush=True)
-        return 1
+        exit_code = 1
 
-    return 0
+    finally:
+        stop_all(stop_event, threads, fake_server)
+
+    return exit_code
 
 if __name__ == "__main__":
     # pylint: disable=line-too-long
@@ -113,10 +158,5 @@ if __name__ == "__main__":
         print("  REDIRECTION_LOGS, INTERNAL_LOGS, and MONITORING_LOGS allow (TRUE, FALSE, ONLY)")
         print("")
         sys.exit(0)
-
-    if cfg.influxdb['host'] == "fake":
-        debug_mode = os.getenv("DEBUG_SERVER_INFLUX_FAKE", str(cfg.debug)).lower() in ("1", "true", "yes", "on")
-        FAKE_SERVER_INFLUX = FakeInfluxServer(debug=debug_mode)
-        FAKE_SERVER_INFLUX.start()
 
     sys.exit(run())
