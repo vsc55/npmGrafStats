@@ -2,14 +2,15 @@
 """ Handles log lines related to reverse proxies and redirections. """
 from __future__ import annotations
 import re
+import sys
 import ipaddress
 from typing import Literal, TypedDict
 from enum import Enum
 from config import cfg, LogMode, TypeRegex
 from utils import debug_msg, is_ip_in_range, format_time
-from connector.influx_client import InfluxRecord
+from connector.influx import InfluxRecord
 from api.external.abuseipdb import AbuseIPDB, AbuseIPDBStatusReturn
-from api.external.geoip2 import GeoIP2Client, GeoIP2CityResult, GeoIP2ASNResult
+from api.external.geoip2 import GeoIP2Client
 
 LogKind = Literal["proxy", "redirection"]
 
@@ -77,7 +78,7 @@ def _is_internal_ip(ip: str) -> bool:
         return False
 
     # IP privada (usa regex global)
-    if cfg.regex.search(ip, TypeRegex.IP_PRIVATE):
+    if cfg.regex.fullmatch(ip, TypeRegex.IP_PRIVATE):
         return True
 
     # IP externa propia

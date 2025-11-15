@@ -7,7 +7,7 @@ from config import LogMode, cfg
 from logwatcher import LogTask, LineProcessor
 from npm.handlers import handle_line, LogKind
 from npm.config import LogsPaths
-from connector.influx_client import InfluxRecord
+from connector.influx import InfluxRecord
 
 def make_processor(mode: LogKind) -> LineProcessor:
     """ Creates a line processor for the given log mode. """
