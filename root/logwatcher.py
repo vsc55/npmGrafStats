@@ -24,14 +24,16 @@ def follow_file(
         path: str,
         description: str,
         processor: LineProcessor,
-        cli_influx: InfluxClient
+        cli_influx: InfluxClient,
+        stop_event: threading.Event
 ) -> None:
     """Follow a log file and process new lines as they are added."""
     try:
         with open(path, "r", encoding="utf-8") as f:
             f.seek(0, os.SEEK_END)
-            print(f"[{description}] Following: {path}", flush=True)
-            while True:
+            debug_msg(f"[{description}] Following: {path}")
+
+            while not stop_event.is_set():
                 line = f.readline()
                 if not line:
                     time.sleep(0.2)
@@ -101,7 +103,7 @@ def watch_logs(task: LogTask, stop_event: threading.Event, cli_influx: InfluxCli
 
             t = threading.Thread(
                 target=follow_file,
-                args=(path, description, processor, cli_influx),
+                args=(path, description, processor, cli_influx, stop_event),
                 daemon=True,
             )
             t.start()
