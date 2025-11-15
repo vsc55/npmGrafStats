@@ -6,11 +6,26 @@ import threading
 
 from config import cfg
 from logwatcher import start_log_tasks
+from connector.influx import InfluxClient
 
 def run() -> None:
     """Main function to start log watchers based on configuration."""
 
     stop_event = threading.Event()
+
+    cli_influx = InfluxClient.create(
+        url=cfg.influx_url,
+        org=cfg.influx_org,
+        token=cfg.influx_token,
+        bucket=cfg.influx_bucket,
+        debug=cfg.debug,
+    )
+    
+    if cli_influx.test_connection():
+        print("InfluxDB OK, podemos escribir puntos.")
+    else:
+        print("No se puede conectar a InfluxDB.")
+
 
     # Get log tasks from npm module or other sources
     tasks = cfg.all_log_tasks

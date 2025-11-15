@@ -121,3 +121,4 @@ docker-compose.override.yml
 *.old
 .env.dev
 *.mmdb
+.env.test
