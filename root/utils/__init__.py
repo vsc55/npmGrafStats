@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """ Utility functions for npmGrafStats. """
 from __future__ import annotations
-from typing import Any
-from typing import TYPE_CHECKING
 import ipaddress
 
 def debug_msg(message: str):

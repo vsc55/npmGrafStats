@@ -3,11 +3,10 @@
 from __future__ import annotations
 import os
 import re
-import subprocess
 import importlib
 import dataclasses
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Iterable, TYPE_CHECKING, Any
+from typing import Optional, TYPE_CHECKING, Any
 from enum import Enum
 from urllib.request import urlopen
 from utils.external_ip import ExternalIP
