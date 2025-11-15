@@ -95,7 +95,6 @@ def influx_writer(
 def watch_logs(
         task: LogTask,
         stop_event: threading.Event,
-        cli_influx: InfluxClient,
         queue: Queue[InfluxRecord]
 ) -> None:
     """Watch log files matching the pattern of a task and start following new ones."""
@@ -166,7 +165,6 @@ def start_log_tasks(
             args=(
                 task,
                 stop_event,
-                cli_influx,
                 queue
             ),
             daemon=True,
