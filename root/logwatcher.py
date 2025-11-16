@@ -153,39 +153,61 @@ def watch_logs(
             flush=True
         )
 
-def start_log_tasks(
-        tasks: Iterable[LogTask],
-        stop_event: threading.Event,
-        cli_influx: InfluxClient,
-) -> list[threading.Thread]:
-    """Arranca un thread por LogTask y los devuelve para posible inspección."""
-    threads: list[threading.Thread] = []
 
-    # Shared InfluxDB write queue
-    queue: Queue[InfluxRecord] = Queue()
 
-    # Start InfluxDB writer thread
-    writer_thread = threading.Thread(
-        target=influx_writer,
-        args=(queue, stop_event, cli_influx),
-        daemon=True,
-        name="influx-writer",
-    )
-    writer_thread.start()
-    threads.append(writer_thread)
+class LogWatcherManager:
+    """Encapsula la gestión de hilos de log + writer de Influx."""
 
-    for task in list(tasks): # copy to avoid issues if tasks is modified
-        t = threading.Thread(
-            target=watch_logs,
-            args=(
-                task,
-                stop_event,
-                queue
-            ),
+    def __init__(self, tasks: Iterable[LogTask], cli_influx: InfluxClient) -> None:
+        self._tasks = list(tasks)
+        self._cli_influx = cli_influx
+
+        self.stop_event = threading.Event()
+        self.queue: Queue[InfluxRecord] = Queue()
+        self.threads: list[threading.Thread] = []
+        self._started = False
+
+    # --- Public methods ---
+    def start(self) -> None:
+        """Start writer + watchers."""
+        if self._started:
+            return
+        self._started = True
+
+        # Writer
+        writer_thread = threading.Thread(
+            target=influx_writer,
+            args=(self.queue, self.stop_event, self._cli_influx),
             daemon=True,
-            name=f"watch-logs-{task.description}",
+            name="influx-writer",
         )
-        t.start()
-        threads.append(t)
+        writer_thread.start()
+        self.threads.append(writer_thread)
 
-    return threads
+        # Watchers
+        for task in self._tasks:
+            t = threading.Thread(
+                target=watch_logs,
+                args=(task, self.stop_event, self.queue),
+                daemon=True,
+                name=f"watch-logs-{task.description}",
+            )
+            t.start()
+            self.threads.append(t)
+
+    def stop(self) -> None:
+        """Signal all threads to stop and join them."""
+        if not self._started:
+            return
+
+        print("[STOP] Stopping all log threads...", flush=True)
+        self.stop_event.set()
+
+        for t in self.threads:
+            print(f"[STOP] Joining thread: {t.name} (alive={t.is_alive()})", flush=True)
+            if t.is_alive():
+                t.join()
+            print(f"[STOP] Thread finished: {t.name} (alive={t.is_alive()})", flush=True)
+
+        print("[STOP] All threads stopped.", flush=True)
+        self._started = False
