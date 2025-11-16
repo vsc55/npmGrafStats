@@ -237,7 +237,7 @@ class InfluxClient:
         try:
             self._write_api.write(bucket=self.bucket, org=self.org, record=point)
 
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:
             raise InfluxClientConnectionError(
                 "Failed to write point",
                 url=self.url,

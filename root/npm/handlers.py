@@ -33,10 +33,10 @@ def _extract_ips(line: str) -> tuple[str | None, str | None]:
     using the combined regex cfg.regex.ip (IPv4 + IPv6).
     """
     pattern = cfg.regex.compile(TypeRegex.IP)
-    matches = list(pattern.finditer(line))
+    matches = [m.group(0) for m in pattern.finditer(line)]
 
-    outside_ip = matches[0].group(0) if len(matches) >= 1 else None
-    target_ip = matches[1].group(0) if len(matches) >= 2 else None
+    outside_ip = matches[0] if len(matches) > 0 else None
+    target_ip = matches[1] if len(matches) > 1 else None
     return outside_ip, target_ip
 
 def _extract_domain(line: str) -> str:
@@ -56,10 +56,7 @@ def _extract_length(line: str) -> int:
     if len(parts) >= 14:
         m = re.search(r"\d+", parts[13])
         if m:
-            try:
-                return int(m.group(0))
-            except ValueError:
-                return 0
+            return int(m.group(0))
     return 0
 
 def _extract_measurement_time(line: str) -> str:

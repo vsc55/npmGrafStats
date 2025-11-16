@@ -108,7 +108,7 @@ def run() -> None:
         print("No log watcher threads started.", flush=True)
         return 0
 
-    if not fake_clients is None:
+    if fake_clients is not None:
         fake_clients.start()
 
     exit_code = 0
@@ -124,9 +124,10 @@ def run() -> None:
     except SystemExit as e:
         exit_code = e.code if e.code is not None else 0
 
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:
         print(f"Error in main loop: {e}", file=sys.stderr, flush=True)
         exit_code = 1
+        raise
 
     finally:
         if fake_clients is not None:

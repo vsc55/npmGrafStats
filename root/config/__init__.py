@@ -292,6 +292,7 @@ class GlobalConfig:
         try:
             value = int(raw)
         except ValueError:
+            print(f"Invalid integer for {name}: {raw}. Using default {default}.", flush=True)
             return default
 
         if min_value is not None and value < min_value:

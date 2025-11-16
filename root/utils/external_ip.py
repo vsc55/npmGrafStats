@@ -14,7 +14,7 @@ class ExternalIP:
     def _detect_external_ip(self) -> Optional[str]:
         try:
             with urlopen("https://ifconfig.me/ip", timeout=5) as response:
-                ip = response.read().decode().strip()
+                ip = response.read().decode("utf-8").strip()
                 return ip or None
 
         except Exception as e:

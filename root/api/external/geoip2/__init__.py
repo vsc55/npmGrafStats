@@ -263,19 +263,30 @@ class GeoIP2Client:
 
         asn_info = self._base_asn()
         reader_db = self.read_db(self.asn_db_path)
-        data_asn = reader_db.asn(self.ip)
-        reader_db.close()
 
-        if data_asn is None:
-            asn_info["status"] = "no_data"
-            asn_info["error_message"] = "Missing ASN data"
-            self._debug_print(f"[GeoIP2] No ASN data for IP {self.ip} in ASN database")
-        else:
-            asn_info["asn"] = str(data_asn.autonomous_system_number) or ""
-            asn_info["org"] = data_asn.autonomous_system_organization or ""
-            asn_info["ip"] = str(data_asn.ip_address) or ""
-            asn_info["network"] = str(data_asn.network) or ""
-            asn_info["status"] = "success"
+        data_asn = None
+        try:
+            data_asn = reader_db.asn(self.ip)
+            if data_asn is None:
+                asn_info["status"] = "no_data"
+                asn_info["error_message"] = "Missing ASN data"
+                self._debug_print(f"[GeoIP2] No ASN data for IP {self.ip} in ASN database")
+            else:
+                asn_info["asn"] = str(data_asn.autonomous_system_number) or ""
+                asn_info["org"] = data_asn.autonomous_system_organization or ""
+                asn_info["ip"] = str(data_asn.ip_address) or ""
+                asn_info["network"] = str(data_asn.network) or ""
+                asn_info["status"] = "success"
+
+        except ValueError as ve:
+            raise GeoIP2ConfigError("Invalid IP address", "ip", self.ip) from ve
+
+        except geoip2.errors.AddressNotFoundError as ane:
+            raise GeoIP2ConfigError("IP address not found in ASN DB", "ip", self.ip) from ane
+
+        finally:
+            if reader_db is not None:
+                reader_db.close()
 
         self._debug_print(f"[GeoIP2] ASN result: {asn_info}")
         return asn_info

@@ -119,6 +119,9 @@ class LogWatcherManager:
                     try:
                         records = processor(line)
 
+                    # Used broad Exception to avoid that an error in a line
+                    # stops the file following. This will log the error, the thread
+                    # will end and in the next watch_logs iteration it will be restarted.
                     except Exception as e:  # pylint: disable=broad-exception-caught
                         print(
                             f"[{description}] Error processing line: {e}",
