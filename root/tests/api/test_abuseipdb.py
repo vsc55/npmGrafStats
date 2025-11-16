@@ -16,6 +16,7 @@ from api.external.abuseipdb.exceptions import (
     AbuseIPDBConfigError,
     AbuseIPDBNetworkError,
     AbuseIPDBResponseError,
+    AbuseIPDBRateLimitError,
 )
 
 
@@ -281,14 +282,13 @@ def test_api_check_http_error_raises_response_error(monkeypatch, capsys):
     abuse.ip = "8.8.8.8"
     abuse.show = True
 
+    err_code = 420
+    err_detail = "Error detail message"
+
     def fake_request(*args, **kwargs):
         return DummyResponse(
-            429,
-            {
-                "errors": [
-                    {"detail": "Too many requests", "status": 429}
-                ]
-            },
+            err_code,
+            {"errors": [{"detail": err_detail, "status": err_code}]}
         )
 
     monkeypatch.setattr(
@@ -300,12 +300,43 @@ def test_api_check_http_error_raises_response_error(monkeypatch, capsys):
         abuse.api_check()
 
     err = excinfo.value
-    assert err.status_code == 429
-    assert err.api_errors[0]["detail"] == "Too many requests"
+    assert err.status_code == err_code
+    assert err.api_errors[0]["detail"] == err_detail
 
     out = capsys.readouterr().out
-    assert "AbuseIPDB request for 8.8.8.8: 429" in out
-    assert "Too many requests" in out
+    assert f"AbuseIPDB request for {abuse.ip}: {err_code}" in out
+    assert err_detail in out
+
+
+def test_api_check_http_error_ratelimit(monkeypatch, capsys):
+    """HTTP 429 -> AbuseIPDBRateLimitError with rate limit info."""
+    # pylint: disable=line-too-long
+
+    abuse = AbuseIPDB()
+    abuse.key = "KEY123"
+    abuse.ip = "8.8.8.8"
+    abuse.show = True
+
+    err_code = 429
+    err_detail = "Daily rate limit of 3000 requests exceeded for this endpoint. See headers for additional details."
+
+    def fake_request(*args, **kwargs):
+        return DummyResponse(
+            err_code,
+            {"errors": [{"detail": err_detail, "status": err_code}]}
+        )
+
+    monkeypatch.setattr(
+        "api.external.abuseipdb.requests.request",
+        fake_request,
+    )
+
+    with pytest.raises(AbuseIPDBRateLimitError) as excinfo:
+        abuse.api_check()
+
+    err = excinfo.value
+    assert err.status_code == err_code
+    assert err.api_errors[0]["detail"] == err_detail
 
 
 def test_api_check_debug_prints_serializable_json(monkeypatch, capsys):
