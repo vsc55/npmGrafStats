@@ -7,7 +7,7 @@ import pytest
 
 import connector.influx as influx_module
 from connector.influx import InfluxClient, InfluxRecord
-from connector.influx.exception import InfluxClientConfigError, InfluxClientInitError
+from connector.influx.exceptions import InfluxClientConfigError, InfluxClientInitError
 
 
 # -------------------- Dummies -------------------- #

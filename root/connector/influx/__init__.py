@@ -8,7 +8,7 @@ from typing import Optional
 import threading
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
-from connector.influx.exception import (
+from connector.influx.exceptions import (
     InfluxClientConfigError,
     InfluxClientInitError,
     InfluxClientConnectionError

@@ -311,13 +311,13 @@ class GlobalConfig:
         newcfg.internal_logs = LogMode.from_env("INTERNAL_LOGS", LogMode.FALSE)
         newcfg.monitoring_logs = LogMode.from_env("MONITORING_LOGS", LogMode.FALSE)
 
-        for key, env_name in (
-            ("host", "INFLUX_HOST"),
-            ("bucket", "INFLUX_BUCKET"),
-            ("org", "INFLUX_ORG"),
-            ("token", "INFLUX_TOKEN"),
+        for key, env_name, default in (
+            ("host", "INFLUX_HOST", ""),
+            ("bucket", "INFLUX_BUCKET", "npmgrafstats"),
+            ("org", "INFLUX_ORG", "npmgrafstats"),
+            ("token", "INFLUX_TOKEN", ""),
         ):
-            newcfg.influxdb[key] = os.getenv(env_name, "")
+            newcfg.influxdb[key] = os.getenv(env_name, default)
 
         newcfg.influxdb_retry_connect = newcfg.get_env_int("INFLUX_RETRY_CONNECT", 10, min_value=0)
         newcfg.influxdb_retry_delay = newcfg.get_env_int("INFLUX_RETRY_DELAY", 5, min_value=0)

@@ -7,6 +7,7 @@ import time
 from config import cfg
 from logwatcher import LogWatcherManager
 from connector.influx import InfluxClient
+from connector.influx.exceptions import InfluxClientConfigError
 from connector.influx.fake_server import FakeInfluxServer
 from utils import debug_msg
 
@@ -61,6 +62,10 @@ def run() -> None:
     try:
         test_connection(cli_influx)
         debug_msg("Connected to InfluxDB successfully.")
+
+    except InfluxClientConfigError as e:
+        print(f"{e}, exiting...", flush=True)
+        return 1
 
     except ValueError as e:
         print(f"{e}, exiting...", flush=True)
@@ -122,8 +127,8 @@ if __name__ == "__main__":
         print("  INFLUX_RETRY_CONNECT    Number of times to retry InfluxDB connection (default: 10)")
         print("  INFLUX_RETRY_DELAY      Delay in seconds between InfluxDB connection retries (default: 5)")
         print("  INFLUX_HOST             InfluxDB host URL (e.g., http://localhost:8086)")
-        print("  INFLUX_BUCKET           InfluxDB bucket name")
-        print("  INFLUX_ORG              InfluxDB organization name")
+        print("  INFLUX_BUCKET           InfluxDB bucket name (default: npmgrafstats)")
+        print("  INFLUX_ORG              InfluxDB organization name (default: npmgrafstats)")
         print("  INFLUX_TOKEN            InfluxDB authentication token")
         print("  ABUSEIP_KEY             API key for AbuseIPDB (if used)")
         print("  REDIRECTION_LOGS        Enable redirection logs (default: TRUE)")

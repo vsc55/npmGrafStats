@@ -9,7 +9,7 @@ import os
 import pytest
 
 from connector.influx import InfluxClient, InfluxRecord
-from connector.influx.exception import InfluxClientConnectionError
+from connector.influx.exceptions import InfluxClientConnectionError
 
 INFLUX_HOST = os.getenv("TEST_INFLUX_HOST", "")
 INFLUX_ORG = os.getenv("TEST_INFLUX_ORG", "")

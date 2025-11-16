@@ -37,14 +37,18 @@ class LogWatcherManager:
         self.stop_event = threading.Event()
         self.queue: Queue[InfluxRecord] = Queue()
         self.threads: list[threading.Thread] = []
-        self._started = False
+        self._running = False
+
+        # started[description][path] = Thread
+        self._started: dict[str, dict[str, threading.Thread]] = {}
+        self._lock = threading.Lock()
 
     # --- Public methods ---
     def start(self) -> None:
         """Start writer + watchers."""
-        if self._started:
+        if self._running:
             return
-        self._started = True
+        self._running = True
 
         # Writer InfluxDB thread
         writer_thread = threading.Thread(
@@ -67,9 +71,10 @@ class LogWatcherManager:
             self.threads.append(t)
             time.sleep(0.5) # stagger thread starts
 
+
     def stop(self) -> None:
         """Signal all threads to stop and join them."""
-        if not self._started:
+        if not self._running:
             return
 
         print("[STOP] Stopping all log threads...", flush=True)
@@ -82,7 +87,16 @@ class LogWatcherManager:
             print(f"[STOP] Thread finished: {t.name} (alive={t.is_alive()})", flush=True)
 
         print("[STOP] All threads stopped.", flush=True)
-        self._started = False
+        self._running = False
+
+
+    def started_paths_snapshot(self) -> dict[str, list[str]]:
+        """Return a snapshot of currently started log paths per task description."""
+        with self._lock:
+            return {
+                desc: list(paths.keys())
+                for desc, paths in self._started.items()
+            }
 
 
     # --- Internal methods ---
@@ -145,18 +159,34 @@ class LogWatcherManager:
                 self.queue.task_done()
 
 
+    def _get_started_dict_for_task(self, description: str) -> dict[str, threading.Thread]:
+        """Get or create the started dict for a given task description."""
+        with self._lock:
+            return self._started.setdefault(description, {})
+
+    def _del_started_for_path(self, started: dict[str, threading.Thread], path: str) -> None:
+        """Delete the started entry for a given path."""
+        with self._lock:
+            # Another thread may have touched on the dict, just in case
+            if path in started:
+                del started[path]
+
+
     def _watch_logs(self, task: LogTask) -> None:
         """Watch log files matching the pattern of a task and start following new ones."""
-        started: dict[str, threading.Thread] = {}
+        # started: dict[str, threading.Thread] = {}
         pattern = task.pattern
         description = task.description
+
+        # dict[path] = Thread for this task description
+        started = self._get_started_dict_for_task(description)
 
         while not self.stop_event.is_set():
             # Clean up finished threads
             for path, th in list(started.items()):
                 if not th.is_alive():
                     print(f"[{description}] Stopped following: {path} (thread ended)", flush=True)
-                    del started[path]
+                    self._del_started_for_path(started, path)
 
             debug_msg(f"[{description}] Scanning for log files matching: {pattern}")
             debug_msg(f"[{description}] Already following: {len(started)} files")
@@ -172,7 +202,8 @@ class LogWatcherManager:
                         continue
 
                     print(f"[{description}] Restarting following: {path}", flush=True)
-                    del started[path]
+                    self._del_started_for_path(started, path)
+
                 else:
                     print(f"[{description}] Detected new log file: {path}", flush=True)
 
@@ -184,6 +215,8 @@ class LogWatcherManager:
                 )
                 t.start()
                 started[path] = t
+                with self._lock:
+                    started[path] = t
 
             time.sleep(SCAN_INTERVAL)
 
@@ -199,3 +232,7 @@ class LogWatcherManager:
                 f"[STOP][{description}] Follow thread finished for: {path} (alive={th.is_alive()})",
                 flush=True
             )
+
+        # Clear started dict for this task
+        with self._lock:
+            self._started[description] = {}
