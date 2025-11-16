@@ -17,7 +17,7 @@ def test_server_not_started_raises_on_url_and_port():
     with pytest.raises(RuntimeError):
         _ = srv.get_port
 
-    # host sí está disponible siempre
+    # host is always available
     assert srv.get_host == "127.0.0.1"
     assert srv.is_running is False
 
@@ -35,7 +35,7 @@ def test_server_start_and_ping_and_stop():
 
         # /ping -> 204
         req = urllib.request.Request(f"{srv.url}/ping", method="GET")
-        with urllib.request.urlopen(req) as resp:  # nosec B310 (sólo tests)
+        with urllib.request.urlopen(req) as resp:  # nosec B310 (tests only)
             assert resp.status == 204
 
         # ruta inexistente -> 404
@@ -106,9 +106,9 @@ def test_context_manager_starts_and_stops():
         assert srv.is_running is True
         assert srv.get_host == "127.0.0.1"
 
-        # /ping dentro del with funciona
+        # /ping inside the with works
         with urllib.request.urlopen(f"{srv.url}/ping") as resp:  # nosec B310
             assert resp.status == 204
 
-    # fuera del with el server está parado
+    # outside the with the server is stopped
     assert srv.is_running is False

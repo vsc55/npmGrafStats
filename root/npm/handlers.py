@@ -252,8 +252,8 @@ def handle_line(line: str, mode: LogKind) -> list[InfluxRecord]:
     elif _is_monitoring_ip(outside_ip):
         debug_msg(f"[{mode}] An excluded monitoring service checked: {domain}")
 
-        # Igual que el bash: si MONITORING_LOGS=TRUE se envía a MonitoringRProxyIPs,
-        # y NUNCA cae al else de conexiones normales.
+        # Same as bash: if MONITORING_LOGS=TRUE it's sent to MonitoringRProxyIPs,
+        # and NEVER falls to the else of normal connections.
         if cfg.monitoring_logs is not LogMode.FALSE:
             measurement = "MonitoringRProxyIPs"
             send_type = TypeSendRecord.PUBLIC

@@ -62,7 +62,7 @@ def test_external_ip_uses_cache_within_ttl(monkeypatch):
 
     assert ip1 == "1.2.3.4"
     assert ip2 == "1.2.3.4"
-    assert calls["n"] == 1  # solo una llamada → la segunda usa caché
+    assert calls["n"] == 1  # only one call → the second uses cache
 
 
 def test_external_ip_refresh_after_ttl(monkeypatch):
@@ -71,7 +71,7 @@ def test_external_ip_refresh_after_ttl(monkeypatch):
 
     def fake_urlopen(url, timeout=5):
         calls["n"] += 1
-        # devolvemos algo distinto según llamada
+        # return something different according to call
         return FakeResponse(b"10.0.0.1" if calls["n"] == 1 else b"10.0.0.2")
 
     monkeypatch.setattr(ext_mod, "urlopen", fake_urlopen)
@@ -82,13 +82,13 @@ def test_external_ip_refresh_after_ttl(monkeypatch):
     ext = ExternalIP(ttl_seconds=60)
 
     ip1 = ext.get_ip()
-    # avanzamos más que el TTL
+    # advance more than the TTL
     monkeypatch.setattr(ext_mod.time, "time", lambda: base_time + 120)
     ip2 = ext.get_ip()
 
     assert ip1 == "10.0.0.1"
     assert ip2 == "10.0.0.2"
-    assert calls["n"] == 2  # dos llamadas → la segunda refresca
+    assert calls["n"] == 2  # two calls → the second refreshes
 
 
 def test_external_ip_force_refresh(monkeypatch):

@@ -15,7 +15,7 @@ def test_debug_msg_prints_when_debug_true(monkeypatch):
     class DummyCfg: # pylint: disable=missing-class-docstring,too-few-public-methods
         debug = True
 
-    # Sustituimos config.cfg por nuestro dummy
+    # We replace config.cfg with our dummy
     monkeypatch.setattr(config, "cfg", DummyCfg(), raising=False)
 
     printed: list[str] = []
@@ -23,7 +23,7 @@ def test_debug_msg_prints_when_debug_true(monkeypatch):
     def fake_print(msg, *args, **kwargs):
         printed.append(msg)
 
-    # parcheamos print global
+    # we patch global print
     monkeypatch.setattr("builtins.print", fake_print)
 
     utils.debug_msg("hello debug")

@@ -256,12 +256,12 @@ def test_write_point_empty_measurement_or_fields_skip_write(patched_influx):
     dummy_client = patched_influx["clients"][0]
     dummy_write_api: DummyWriteApi = client._write_api
 
-    # Caso 1: measurement vacío
+    # Case 1: empty measurement
     rec1 = InfluxRecord(measurement="", tags={}, fields={"v": 1})
     client.write_point(rec1)
     assert dummy_write_api.writes == []
 
-    # Caso 2: fields vacío
+    # Case 2: empty fields
     rec2 = InfluxRecord(measurement="m", tags={}, fields={})
     client.write_point(rec2)
     assert dummy_write_api.writes == []  # sigue sin escribir nada

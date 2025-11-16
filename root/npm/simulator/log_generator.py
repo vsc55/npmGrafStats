@@ -118,21 +118,21 @@ class NginxLogGenerator:
         self._output = value
 
 
-    # ---------- generación de IPs ----------
+    # ---------- IP generation ----------
 
     def _rand_private_ip(self) -> str:
         base = random.choice(self.PRIVATE_IP_RANGES)
         return f"{base[0]}.{base[1]}.{random.randint(0, 255)}.{random.randint(1, 254)}"
 
     def _rand_public_ip(self) -> str:
-        # Muy simple: genera IP y evita rangos típicos privados/reservados
+        # Very simple: generate IP and avoid typical private/reserved ranges
         while True:
             o1 = random.randint(1, 254)
             o2 = random.randint(0, 255)
             o3 = random.randint(0, 255)
             o4 = random.randint(1, 254)
 
-            # excluir rangos privados/comunes
+            # exclude private/common ranges
             if o1 == 10:
                 continue
             if o1 == 127:
@@ -149,11 +149,11 @@ class NginxLogGenerator:
             return f"{o1}.{o2}.{o3}.{o4}"
 
     def _get_client_ip(self) -> str:
-        # 70% IP ya vista (cliente "fiel"), 30% nueva
+        # 70% already seen IP ("loyal" client), 30% new
         if self._client_ips and random.random() < 0.7:
             return random.choice(self._client_ips)
 
-        # nueva IP
+        # new IP
         if random.random() < 0.5:
             ip = self._rand_private_ip()
         else:
@@ -162,16 +162,16 @@ class NginxLogGenerator:
         if len(self._client_ips) < self.max_clients:
             self._client_ips.append(ip)
         else:
-            # reemplaza alguna al azar
+            # replace some random one
             idx = random.randrange(len(self._client_ips))
             self._client_ips[idx] = ip
 
         return ip
 
-    # ---------- generación de URLs / hosts ----------
+    # ---------- URL / host generation ----------
 
     def _choose_host(self) -> str:
-        # más peso a www / tienda
+        # more weight to www / shop
         return random.choice(self.HOSTS)
 
     def _choose_path_for_host(self, host: str) -> str:
@@ -227,7 +227,7 @@ class NginxLogGenerator:
         if host.startswith("static."):
             pool += static * 4
 
-        # de vez en cuando, scans/sondas
+        # from time to time, scans/probes
         if random.random() < 0.1:
             pool += attackish
 
@@ -253,13 +253,13 @@ class NginxLogGenerator:
         return code, cfg
 
     def _choose_referrer(self, host: str) -> str:
-        # mayoría sin referrer, a veces buscadores, a veces el propio sitio
+        # mostly no referrer, sometimes search engines, sometimes own site
         r = random.random()
         if r < 0.6:
             return "-"
         if r < 0.8:
             return random.choice(self.REFERRERS)
-        # tráfico interno
+        # internal traffic
         return f"https://{host}/"
 
     def _estimate_size(self, path: str, status: int) -> int:
@@ -319,7 +319,7 @@ class NginxLogGenerator:
 
         return line
 
-    # ---------- bucle de escritura ----------
+    # ---------- writing loop ----------
 
     def _run(self):
         while self._running:
@@ -329,11 +329,11 @@ class NginxLogGenerator:
                 line = self._gen_line()
                 self._write_line(line)
 
-                # pausas pequeñas dentro del burst
+                # small pauses within the burst
                 if random.random() < 0.2:
                     time.sleep(random.uniform(0.01, 0.05))
 
-            # intervalo medio con jitter
+            # average interval with jitter
             sleep_time = random.uniform(
                 self.base_interval * 0.5,
                 self.base_interval * 1.5,
@@ -386,7 +386,7 @@ class NginxLogGenerator:
             print("[FakeLogGen] Stopping log generation...", flush=True)
 
 if __name__ == "__main__":
-    # ejemplo rápido
+    # quick example
     # gen = NginxLogGenerator(
     #     output="access_simulado.log",
     #     base_interval=0.5,   # media aprox entre bursts

@@ -22,9 +22,9 @@ LogTasksProviderRef = tuple[str, str]  # (module, function_name)
 
 class LogMode(str, Enum):
     """ Enumeration for log modes. """
-    TRUE = "TRUE"     # Habilitado
-    FALSE = "FALSE"   # Deshabilitado
-    ONLY = "ONLY"     # Solo este tipo
+    TRUE = "TRUE"     # Enabled
+    FALSE = "FALSE"   # Disabled
+    ONLY = "ONLY"     # Only this type
 
     @classmethod
     def from_env(cls, name: str, default: "LogMode" | str = FALSE) -> "LogMode":
