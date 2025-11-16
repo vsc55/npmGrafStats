@@ -9,8 +9,10 @@ from logwatcher import LogWatcherManager
 from connector.influx import InfluxClient
 from connector.influx.exceptions import InfluxClientConfigError
 from connector.influx.fake_server import FakeInfluxServer
+from npm.simulator.log_generator import NginxLogGenerator
 from utils import debug_msg
 
+TRUTHY = ("1", "true", "yes", "on")
 
 def test_connection(cli_influx: InfluxClient) -> bool:
     """Test connection to InfluxDB."""
@@ -37,19 +39,39 @@ def test_connection(cli_influx: InfluxClient) -> bool:
 
     return True
 
+
+def env_bool(name: str, default: bool = False) -> bool:
+    """Get boolean value from environment variable."""
+    val = os.getenv(name)
+    if val is None:
+        return bool(default)
+    return str(val).lower() in TRUTHY
+
+
 def run() -> None:
     """Main function to start log watchers based on configuration."""
 
     url = cfg.influxdb['host']
 
-    fake_server = None
+    fake_server : FakeInfluxServer | None = None
+    fake_clients : NginxLogGenerator | None = None
+
+    fake_server_debug = env_bool("DEBUG_SERVER_INFLUX_FAKE", cfg.debug)
+    npm_log_fake_clients = env_bool("NPM_LOG_FAKE_CLIENTS", fake_server_debug)
+    npm_log_fake_clients_debug = env_bool("NPM_LOG_FAKE_CLIENTS_DEBUG", cfg.debug)
+    npm_log_fake_clients_file = os.getenv("NPM_LOG_FAKE_CLIENTS_FILE", "")
+
     if url == "fake":
-        debug_mode = os.getenv(
-            "DEBUG_SERVER_INFLUX_FAKE", str(cfg.debug)
-        ).lower() in ("1", "true", "yes", "on")
-        fake_server = FakeInfluxServer(debug=debug_mode)
+        fake_server = FakeInfluxServer(debug=fake_server_debug)
         fake_server.start()
         url = fake_server.url
+
+        if npm_log_fake_clients:
+            fake_clients = NginxLogGenerator(debug=npm_log_fake_clients_debug)
+            fake_clients.output = npm_log_fake_clients_file
+            fake_clients.base_interval = 5.0 # seconds
+            fake_clients.min_batch = 1
+            fake_clients.max_batch = 5
 
     cli_influx = InfluxClient.create(
         url=url,
@@ -86,6 +108,9 @@ def run() -> None:
         print("No log watcher threads started.", flush=True)
         return 0
 
+    if not fake_clients is None:
+        fake_clients.start()
+
     exit_code = 0
     try:
         while True:
@@ -104,7 +129,13 @@ def run() -> None:
         exit_code = 1
 
     finally:
+        if fake_clients is not None:
+            print("[STOP] Stopping fake log clients...", flush=True)
+            fake_clients.stop()
+            print("[STOP] Fake log clients stopped.", flush=True)
+
         manager.stop()
+
         if fake_server is not None:
             print("[STOP] Stopping fake InfluxDB server...", flush=True)
             fake_server.stop()
