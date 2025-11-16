@@ -4,13 +4,15 @@ from __future__ import annotations
 import json
 import ipaddress
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import TypedDict, Any
 import requests
 from api.external.abuseipdb.exceptions import (
     AbuseIPDBConfigError,
     AbuseIPDBNetworkError,
-    AbuseIPDBResponseError
+    AbuseIPDBResponseError,
+    AbuseIPDBRateLimitError
 )
 
 class AbuseIPDBResult(TypedDict, total=False):
@@ -298,27 +300,38 @@ class AbuseIPDB:
         errors = response_json.get("errors", []) or []
         data = response_json.get("data", {}) or {}
 
-        if response.status_code != 200:
-            if self.show:
-                print(
-                    f"[Error] AbuseIPDB request for {self.ip}: {response.status_code}",
-                    flush=True
+
+        match response.status_code:
+            case 200:
+                # status_code == 200 → SUCCESS or WARNING
+                result: AbuseIPDBResult = self.base_result(AbuseIPDBStatusReturn.SUCCESS)
+                result["status_code"] = response.status_code
+                result["data"] = data
+                result["errors"] = errors
+
+            case 429:
+                err_msg = errors[0].get("detail", "Unknown detail") if errors else "Unknown error"
+                raise AbuseIPDBRateLimitError(
+                    err_msg,
+                    response=response,
+                    api_errors=errors,
                 )
-                for err in errors:
-                    detail = err.get("detail", "No detail provided")
-                    print(f"  [AbuseIPDB Error] {detail}", flush=True)
 
-            raise AbuseIPDBResponseError(
-                "AbuseIPDB request failed",
-                status_code=response.status_code,
-                api_errors=errors,
-            )
+            case _:
+                if self.show:
+                    print(
+                        f"[Error] AbuseIPDB request for {self.ip}: {response.status_code}",
+                        flush=True
+                    )
+                    for err in errors:
+                        detail = err.get("detail", "No detail provided")
+                        print(f"  [AbuseIPDB Error] {detail}", flush=True)
 
-        # status_code == 200 → SUCCESS o WARNING
-        result: AbuseIPDBResult = self.base_result(AbuseIPDBStatusReturn.SUCCESS)
-        result["status_code"] = response.status_code
-        result["data"] = data
-        result["errors"] = errors
+                raise AbuseIPDBResponseError(
+                    "AbuseIPDB request failed",
+                    status_code=response.status_code,
+                    api_errors=errors,
+                )
 
         if not data:
             result["status"] = AbuseIPDBStatusReturn.WARNING

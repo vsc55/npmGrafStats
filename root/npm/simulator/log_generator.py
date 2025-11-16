@@ -58,7 +58,15 @@ class NginxLogGenerator:
         ("192", "168", "0"),    # 192.168.0.0 – 192.168.255.255
     ]
 
-    METHODS = ["GET", "POST", "HEAD"]
+    METHODS = {
+        "GET": 70,
+        "POST": 30,
+        "HEAD": 10,
+        "PUT": 5,
+        "DELETE": 5,
+        "PATCH": 5,
+        "OPTIONS": 5,
+    }
     HTTP_VERSIONS = ["HTTP/1.0", "HTTP/1.1", "HTTP/2.0"]
 
     STATUS_DISTRIBUTION = {
@@ -227,6 +235,16 @@ class NginxLogGenerator:
 
     # ---------- otras piezas ----------
 
+    def _choose_method(self) -> str:
+        methods = list(self.METHODS.keys())
+        weights = list(self.METHODS.values())
+
+        # if only one method, return it directly (testing convenience)
+        if len(methods) == 1:
+            return methods[0]
+
+        return random.choices(methods, weights=weights, k=1)[0]
+
     def _choose_status(self) -> int:
         codes = list(self.STATUS_DISTRIBUTION.keys())
         weights = [self.STATUS_DISTRIBUTION[c]["weight"] for c in codes]
@@ -260,7 +278,7 @@ class NginxLogGenerator:
         ts = time.strftime('[%d/%b/%Y:%H:%M:%S %z]')
 
         status, status_cfg = self._choose_status()
-        method = random.choices(self.METHODS, weights=[80, 15, 5], k=1)[0]
+        method = self._choose_method()
         scheme = random.choice(["http", "https"])
         host = self._choose_host()
         path = self._choose_path_for_host(host)
