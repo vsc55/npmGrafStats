@@ -6,9 +6,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Optional
 import threading
+
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
-from connector.influx.exceptions import (
+
+from .exceptions import (
     InfluxClientConfigError,
     InfluxClientInitError,
     InfluxClientConnectionError

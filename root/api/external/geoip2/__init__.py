@@ -6,14 +6,14 @@ GeoIP2 local database integration.
 from __future__ import annotations
 import ipaddress
 from dataclasses import dataclass, field
-from typing import TypedDict, Any, Optional
+from typing import TypedDict
 import os
 
 import geoip2.database
 import geoip2.errors
 import maxminddb
 
-from api.external.geoip2.exceptions import (
+from .exceptions import (
     GeoIP2ConfigError,
     GeoIP2PathDBError
 )

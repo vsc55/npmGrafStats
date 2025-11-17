@@ -7,31 +7,19 @@ import sys
 import time
 import glob
 import threading
-from dataclasses import dataclass
-from typing import Callable, Iterable
 from queue import Queue, Empty
-
+from tasks import LogTask, TasksConfig
 from utils import debug_msg
 from connector.influx import InfluxRecord, InfluxClient
-
-LineProcessor = Callable[[str], list[InfluxRecord]]
 
 TAIL_POLL_INTERVAL = 0.2   # seconds between checks for new lines in follow_file
 SCAN_INTERVAL = 5.0        # seconds between scans for new log files in watch_logs
 
-@dataclass(frozen=True)
-class LogTask:
-    """Defines a log watching task."""
-    pattern: str             # p.ej. "/logs/proxy-host-*_access.log"
-    description: str         # only for logging purposes
-    processor: LineProcessor # function handle_line(line)
-
-
 class LogWatcherManager:
     """Manages multiple log watching tasks and a single InfluxDB writer."""
 
-    def __init__(self, tasks: Iterable[LogTask], cli_influx: InfluxClient) -> None:
-        self._tasks = list(tasks)
+    def __init__(self, tasks: TasksConfig, cli_influx: InfluxClient) -> None:
+        self._tasks = tasks
         self._cli_influx = cli_influx
 
         self.stop_event = threading.Event()
@@ -60,7 +48,7 @@ class LogWatcherManager:
         self.threads.append(writer_thread)
 
         # Watchers
-        for task in self._tasks:
+        for task in list(self._tasks.tasks):
             t = threading.Thread(
                 target=self._watch_logs,
                 args=(task,),
@@ -167,63 +155,87 @@ class LogWatcherManager:
         with self._lock:
             return self._started.setdefault(description, {})
 
-    def _del_started_for_path(self, started: dict[str, threading.Thread], path: str) -> None:
+
+    def _del_started_for_path(self, desc: str, path: str) -> None:
         """Delete the started entry for a given path."""
         with self._lock:
-            # Another thread may have touched on the dict, just in case
-            if path in started:
-                del started[path]
+            # Another thread may have already removed it
+            try:
+                del self._started[desc][path]
+            except KeyError:
+                pass
 
 
     def _watch_logs(self, task: LogTask) -> None:
         """Watch log files matching the pattern of a task and start following new ones."""
-        # started: dict[str, threading.Thread] = {}
         pattern = task.pattern
-        description = task.description
-
-        # dict[path] = Thread for this task description
-        started = self._get_started_dict_for_task(description)
+        desc = task.description
+        last_is_enabled = None
 
         while not self.stop_event.is_set():
+            if last_is_enabled != task.enabled():
+                last_is_enabled = task.enabled()
+                if last_is_enabled:
+                    print(
+                        f"[{desc}] Log task is ENABLED in configuration, watching logs.",
+                        flush=True
+                    )
+                else:
+                    print(
+                        f"[{desc}] Log task is DISABLED in configuration, not watching logs.",
+                        flush=True
+                    )
+
+            if last_is_enabled is False:
+                time.sleep(SCAN_INTERVAL)
+                continue
+
+            # Refresh started dict
+            started = self._get_started_dict_for_task(desc)
+
             # Clean up finished threads
             for path, th in list(started.items()):
                 if not th.is_alive():
-                    print(f"[{description}] Stopped following: {path} (thread ended)", flush=True)
-                    self._del_started_for_path(started, path)
+                    print(f"[{desc}] Stopped following: {path} (thread ended)", flush=True)
+                    self._del_started_for_path(desc, path)
 
-            debug_msg(f"[{description}] Scanning for log files matching: {pattern}")
-            debug_msg(f"[{description}] Already following: {len(started)} files")
+            debug_msg(f"[{desc}] Scanning for log files matching: {pattern}")
+            debug_msg(f"[{desc}] Already following: {len(started)} files")
 
             for path in sorted(glob.glob(pattern)):
                 if not os.path.isfile(path):
-                    debug_msg(f"[{description}] Ignoring non-regular file: {path}")
+                    debug_msg(f"[{desc}] Ignoring non-regular file: {path}")
                     continue
 
                 if path in started:
                     if started[path].is_alive():
-                        debug_msg(f"[{description}] Already following: {path}")
+                        debug_msg(f"[{desc}] Already following: {path}")
                         continue
 
-                    print(f"[{description}] Restarting following: {path}", flush=True)
-                    self._del_started_for_path(started, path)
+                    print(f"[{desc}] Restarting following: {path}", flush=True)
+                    self._del_started_for_path(desc, path)
 
                 else:
-                    print(f"[{description}] Detected new log file: {path}", flush=True)
+                    print(f"[{desc}] Detected new log file: {path}", flush=True)
 
                 t = threading.Thread(
                     target=self._follow_file,
                     args=(path, task),
                     daemon=False,
-                    name=f"follow-{description}-{os.path.basename(path)}",
+                    name=f"follow-{desc}-{os.path.basename(path)}",
                 )
                 t.start()
-                started[path] = t
                 with self._lock:
-                    started[path] = t
+                    self._started[desc][path] = t
 
             time.sleep(SCAN_INTERVAL)
 
-        # Stop all started follow threads
+        self._stop_all_started(desc)
+
+
+    def _stop_all_started(self, description: str) -> None:
+        """Kill all watch_logs threads for a given task description."""
+        started = self._get_started_dict_for_task(description)
         for path, th in list(started.items()):
             print(
                 f"[STOP][{description}] Joining follow thread for: {path} (alive={th.is_alive()})",

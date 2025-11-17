@@ -3,29 +3,28 @@
 from __future__ import annotations
 
 from typing import List
-
-from config import cfg, TypeRegex
-from utils import debug_msg, format_time
-from logwatcher import InfluxRecord
-
+from config import GlobalConfig
+from utils import debug_msg, format_time, TypeRegex, Regex
+from connector.influx import InfluxRecord
 
 def _extract_ip(line: str) -> str | None:
-    m = cfg.regex.search(line, TypeRegex.IP)
+    m = Regex.search_type(line, TypeRegex.IP)
     return m.group(0) if m else None
-
 
 def _extract_measurement_time(line: str) -> str:
     raw = line[1:27] if len(line) > 27 else ""
     return format_time(raw) or ""
 
-
-def handle_line(line: str, env: str) -> List[InfluxRecord]:
+def handle_line(line: str, env: str, config: GlobalConfig) -> List[InfluxRecord]:
     """
     Procesa una línea de logs de mod_example y devuelve
     una lista de InfluxRecord para escribir.
     """
 
     records: list[InfluxRecord] = []
+
+    if config.debug:
+        debug_msg(f"[mod_example] Processing line: {line.strip()}")
 
     env = env.lower()
     if env not in {"production", "staging"}:

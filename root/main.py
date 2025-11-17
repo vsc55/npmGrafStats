@@ -5,14 +5,13 @@ import os
 import time
 
 from config import cfg
+from tasks import TasksConfig
 from logwatcher import LogWatcherManager
 from connector.influx import InfluxClient
 from connector.influx.exceptions import InfluxClientConfigError
 from connector.influx.fake_server import FakeInfluxServer
 from npm.simulator.log_generator import NginxLogGenerator
-from utils import debug_msg
-
-TRUTHY = ("1", "true", "yes", "on")
+from utils import debug_msg, env_bool
 
 def test_connection(cli_influx: InfluxClient) -> bool:
     """Test connection to InfluxDB."""
@@ -40,26 +39,19 @@ def test_connection(cli_influx: InfluxClient) -> bool:
     return True
 
 
-def env_bool(name: str, default: bool = False) -> bool:
-    """Get boolean value from environment variable."""
-    val = os.getenv(name)
-    if val is None:
-        return bool(default)
-    return str(val).lower() in TRUTHY
-
-
-def run() -> None:
+def run() -> int:
     """Main function to start log watchers based on configuration."""
-
-    url = cfg.influxdb['host']
-
-    fake_server : FakeInfluxServer | None = None
-    fake_clients : NginxLogGenerator | None = None
 
     fake_server_debug = env_bool("DEBUG_SERVER_INFLUX_FAKE", cfg.debug)
     npm_log_fake_clients = env_bool("NPM_LOG_FAKE_CLIENTS", fake_server_debug)
     npm_log_fake_clients_debug = env_bool("NPM_LOG_FAKE_CLIENTS_DEBUG", cfg.debug)
     npm_log_fake_clients_file = os.getenv("NPM_LOG_FAKE_CLIENTS_FILE", "")
+
+
+    url = cfg.influxdb['url']
+
+    fake_server : FakeInfluxServer | None = None
+    fake_clients : NginxLogGenerator | None = None
 
     if url == "fake":
         fake_server = FakeInfluxServer(debug=fake_server_debug)
@@ -80,7 +72,6 @@ def run() -> None:
         bucket=cfg.influxdb['bucket'],
         debug=cfg.debug
     )
-
     try:
         test_connection(cli_influx)
         debug_msg("Connected to InfluxDB successfully.")
@@ -93,9 +84,9 @@ def run() -> None:
         print(f"{e}, exiting...", flush=True)
         return 1
 
-    # Get log tasks from npm module or other sources
-    tasks = cfg.all_log_tasks
-    if not tasks:
+
+    tasks = TasksConfig(config=cfg, auto_discover=True)
+    if tasks.count == 0:
         print("No log tasks configured, exiting...", flush=True)
         return 0
 
@@ -158,17 +149,21 @@ if __name__ == "__main__":
         print("Env variables can be used to override configuration settings:")
         print("  INFLUX_RETRY_CONNECT    Number of times to retry InfluxDB connection (default: 10)")
         print("  INFLUX_RETRY_DELAY      Delay in seconds between InfluxDB connection retries (default: 5)")
-        print("  INFLUX_HOST             InfluxDB host URL (e.g., http://localhost:8086)")
+        print("  INFLUX_URL              InfluxDB host URL (e.g., http://localhost:8086)")
         print("  INFLUX_BUCKET           InfluxDB bucket name (default: npmgrafstats)")
         print("  INFLUX_ORG              InfluxDB organization name (default: npmgrafstats)")
         print("  INFLUX_TOKEN            InfluxDB authentication token")
+        print("")
         print("  ABUSEIP_KEY             API key for AbuseIPDB (if used)")
-        print("  REDIRECTION_LOGS        Enable redirection logs (default: TRUE)")
-        print("  INTERNAL_LOGS           Enable internal logs (default: FALSE)")
-        print("  MONITORING_LOGS         Enable monitoring logs (default: FALSE)")
         print("")
-        print("  REDIRECTION_LOGS, INTERNAL_LOGS, and MONITORING_LOGS allow (TRUE, FALSE, ONLY)")
+        print("  PROXY_LOGS              Enable proxy logs")
+        print("  REDIRECT_LOGS           Enable redirection logs")
+        print("  MONITORING_LOGS         Enable monitoring logs")
+        print("  PUBLIC_LOGS             Enable public logs")
+        print("  INTERNAL_LOGS           Enable internal logs")
         print("")
+        print("  GEO_ASN_DB_PATH         Path to GeoIP ASN database file")
+        print("  GEO_CITY_DB_PATH        Path to GeoIP City database file")
         sys.exit(0)
 
     sys.exit(run())
