@@ -52,11 +52,14 @@ def test_follow_file_processes_new_lines(tmp_path: Path):
         # The actual type of influx record doesn't matter for this test.
         return [rec]
 
+    from config import cfg
     cli = FakeInfluxClient()
     task = LogTask(
         pattern=str(log_file),
         description="test-log",
         processor=processor,
+        enabled=lambda: True,
+        config=cfg,
     )
     mgr = LogWatcherManager(tasks=[task], cli_influx=cli)
 
@@ -94,11 +97,14 @@ def test_follow_file_processes_new_lines(tmp_path: Path):
 
 def test_started_paths_snapshot_return_immutable_copy():
     """Test that started_paths_snapshot returns an independent copy of started paths."""
+    from config import cfg
     cli = FakeInfluxClient()
     task = LogTask(
         pattern="/tmp/*.log",
         description="desc",
         processor=lambda _: [],
+        enabled=lambda: True,
+        config=cfg,
     )
     mgr = LogWatcherManager(tasks=[task], cli_influx=cli)
 
