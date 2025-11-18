@@ -252,7 +252,11 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
     length = result_line["length"]
     measurement_time = result_line["measurement_time"]
 
-    debug_msg(f"[DEBUG] Parsed line - outside_ip: {outside_ip}, target_ip: {target_ip}, domain: {domain}, length: {length}, measurement_time: {measurement_time}")
+    debug_msg(
+        f"[DEBUG] Parsed line - outside_ip: {outside_ip}, "
+        f"target_ip: {target_ip}, domain: {domain}, "
+        f"length: {length}, measurement_time: {measurement_time}"
+    )
 
     if not outside_ip:
         debug_msg(f"[{mode}] No outside IP found in line")

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """ Utility module to get and cache the external IP address. """
 import time
-from urllib.request import urlopen
 from typing import Optional
+from urllib.request import urlopen
+
 
 class ExternalIP:
     """Class to manage external IP detection with caching and TTL."""
@@ -27,9 +28,9 @@ class ExternalIP:
 
     def get_ip(self, force: bool = False) -> Optional[str]:
         """
-        - Si no hay IP cacheada → la obtiene.
-        - Si hay IP y no ha pasado el TTL → devuelve la cacheada.
-        - Si ha pasado el TTL o force=True → la vuelve a obtener.
+        - if not ip is cached → fetch it.
+        - If ip is cached and TTL has not expired → return cached.
+        - If TTL has expired or force=True → fetch it.
         """
         if force or self._needs_refresh():
             ip = self._detect_external_ip()

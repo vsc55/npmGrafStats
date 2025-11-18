@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 from typing import Any
-from datetime import datetime
 import requests
 
 class AbuseIPDBError(Exception):

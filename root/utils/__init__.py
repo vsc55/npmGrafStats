@@ -2,19 +2,19 @@
 """ Utility functions for npmGrafStats. """
 from __future__ import annotations
 
+import dataclasses
+import ipaddress
 import os
 import re
-import ipaddress
-from typing import Optional
-from enum import Enum
-import dataclasses
 from dataclasses import dataclass
+from enum import Enum
+from typing import Optional
 
 TRUTHY = ("1", "true", "yes", "on")
 
 def debug_msg(message: str):
     """ Print debug message if debug mode is enabled. """
-    from config import cfg # pylint: disable=import-outside-toplevel
+    from config import cfg  # pylint: disable=import-outside-toplevel
     if cfg.debug:
         print(message, flush=True)
 
@@ -205,12 +205,18 @@ class Regex:
     def ip_private(self) -> str:
         """ Regex pattern for private IP addresses. """
         return (
-            r"(10(?:\.[0-9]{1,3}){3})|"                                             # 10.0.0.0/8
-            r"(192\.168(?:\.[0-9]{1,3}){2})|"                                       # 192.168.0.0/16
-            r"(172\.(?:1[6-9]|2[0-9]|3[0-1])(?:\.[0-9]{1,3}){2})|"                  # 172.16.0.0–172.31.0.0
-            r"(127(?:\.[0-9]{1,3}){3})|"                                            # Loopback
-            r"(169\.254(?:\.[0-9]{1,3}){2})|"                                       # Link-local
-            r"(100\.(?:6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])(?:\.[0-9]{1,3}){2})"  # CGNAT 100.64–100.127
+            # 10.0.0.0/8
+            r"(10(?:\.[0-9]{1,3}){3})|"
+            # 192.168.0.0/16
+            r"(192\.168(?:\.[0-9]{1,3}){2})|"
+            # 172.16.0.0–172.31.0.0
+            r"(172\.(?:1[6-9]|2[0-9]|3[0-1])(?:\.[0-9]{1,3}){2})|"
+            # Loopback
+            r"(127(?:\.[0-9]{1,3}){3})|"
+            # Link-local
+            r"(169\.254(?:\.[0-9]{1,3}){2})|"
+            # CGNAT 100.64–100.127
+            r"(100\.(?:6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])(?:\.[0-9]{1,3}){2})"
         )
 
     @property
@@ -262,4 +268,3 @@ class Regex:
         """
         regex = Regex()
         return regex.fullmatch(line, typeregex)
-

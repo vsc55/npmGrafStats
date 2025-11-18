@@ -31,7 +31,7 @@ def make_is_enabled(mode: str, config: GlobalConfig) -> ListEnabled:
                 return config.mod_example.mode2_enabled
 
             case _:
-                return None
+                return False  # Default to False for unknown modes
 
     return enabled
 
@@ -94,14 +94,14 @@ def load_config_module(var_module: str | None, config: GlobalConfig, force: bool
 
     if not hasattr(config, var_module):
         raise AttributeError(
-            f"Discovery config provided invalid module name '{var_module}' not present in GlobalConfig."
+            f"Invalid module '{var_module}' in Discovery config (not in GlobalConfig)."
         )
 
     if  getattr(config, var_module) is not None and not force:
         return
 
     config.unlock()
-    setattr(config, var_module, ModExampleConfig(config))
+    setattr(config, var_module, ModExampleConfig(base=config))
     config.lock()
 
 

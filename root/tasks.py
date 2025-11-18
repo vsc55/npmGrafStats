@@ -104,7 +104,7 @@ class TasksConfig:
                 },
                 {
                     "state": "logtasks",
-                    "func_key": "func_tasks",
+                    "func_key": "func_logtasks",
                     "default": "get_log_tasks",
                     "handler": lambda f, *args, **kwargs: self.tasks.extend(f(config=self.config)),
                 },

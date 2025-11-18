@@ -4,8 +4,10 @@
 # pylint: disable=unused-argument
 
 import pytest
+
 import utils.external_ip as ext_mod
 from utils.external_ip import ExternalIP
+
 
 class FakeResponse:
     """Mock response object for urlopen."""
@@ -13,6 +15,7 @@ class FakeResponse:
         self._data = data
 
     def read(self) -> bytes:
+        """ Mock read method. """
         return self._data
 
     def __enter__(self):
