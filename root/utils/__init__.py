@@ -149,7 +149,7 @@ def env_int(name: str, default: int, min_value: Optional[int] = None) -> int:
     return value
 
 
-def parse_float(value: str, default: float | None = None) -> float | None:
+def parse_float(value: str, default: float  = 0) -> float:
     """
     Tries to parse a string to float, returns None if fails.
     """

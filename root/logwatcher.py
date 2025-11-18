@@ -2,18 +2,27 @@
 """Log watching module to monitor log files and process new lines."""
 from __future__ import annotations
 
+import glob
 import os
 import sys
-import time
-import glob
 import threading
-from queue import Queue, Empty
+import time
+from dataclasses import dataclass
+from queue import Empty, Queue
+from typing import Optional
+
+from connector.influx import InfluxClient, InfluxRecord
 from tasks import LogTask, TasksConfig
 from utils import debug_msg
-from connector.influx import InfluxRecord, InfluxClient
 
 TAIL_POLL_INTERVAL = 0.2   # seconds between checks for new lines in follow_file
 SCAN_INTERVAL = 5.0        # seconds between scans for new log files in watch_logs
+
+@dataclass
+class QueueItem:
+    """Item in the log processing queue."""
+    line: Optional[str] = None
+    task: Optional[LogTask] = None
 
 class LogWatcherManager:
     """Manages multiple log watching tasks and a single InfluxDB writer."""
@@ -23,7 +32,7 @@ class LogWatcherManager:
         self._cli_influx = cli_influx
 
         self.stop_event = threading.Event()
-        self.queue: Queue[InfluxRecord] = Queue()
+        self.queue: Queue[QueueItem] = Queue()
         self.threads: list[threading.Thread] = []
         self._running = False
 
@@ -90,13 +99,10 @@ class LogWatcherManager:
     # --- Internal methods ---
     def _follow_file(self, path: str, task: LogTask) -> None:
         """Follow a log file and process new lines as they are added."""
-        description = task.description
-        processor = task.processor
-
         try:
             with open(path, "r", encoding="utf-8") as f:
                 f.seek(0, os.SEEK_END)
-                debug_msg(f"[{description}] Following: {path}")
+                debug_msg(f"[{task.description}] Following: {path}")
 
                 while not self.stop_event.is_set():
                     line = f.readline()
@@ -104,28 +110,13 @@ class LogWatcherManager:
                         time.sleep(TAIL_POLL_INTERVAL)
                         continue
 
-                    try:
-                        records = processor(line)
-
-                    # Used broad Exception to avoid that an error in a line
-                    # stops the file following. This will log the error, the thread
-                    # will end and in the next watch_logs iteration it will be restarted.
-                    except Exception as e:  # pylint: disable=broad-exception-caught
-                        print(
-                            f"[{description}] Error processing line: {e}",
-                            file=sys.stderr,
-                            flush=True
-                        )
-                        continue
-
-                    for rec in records:
-                        self.queue.put(rec)
+                    self.queue.put(QueueItem(line=line, task=task))    
 
         except FileNotFoundError:
-            print(f"[{description}] {path} disappeared", file=sys.stderr, flush=True)
+            print(f"[{task.description}] {path} disappeared", file=sys.stderr, flush=True)
 
         except Exception as e:  # pylint: disable=broad-exception-caught
-            print(f"[{description}] Error following {path}: {e}", file=sys.stderr, flush=True)
+            print(f"[{task.description}] Error following {path}: {e}", file=sys.stderr, flush=True)
 
 
     def _writer_loop(self) -> None:
@@ -133,19 +124,36 @@ class LogWatcherManager:
         debug_msg("[Influx] Writer thread started.")
         while not self.stop_event.is_set() or not self.queue.empty():
             try:
-                rec = self.queue.get(timeout=0.5)
+                item: QueueItem = self.queue.get(timeout=0.5)
             except Empty:
                 continue
 
             try:
-                debug_msg(f"[Influx] Writing record: {rec}")
-                self._cli_influx.write_point(rec)
+                records: list[InfluxRecord] = item.task.processor(item.line)
+
+                # TODO: Debug Speed test
+                print(f"[{item.task.description}] Generated {len(records)} records from line.", flush=True)
+                for rec in records:
+                    try:
+                        # TODO: Debug Speed test
+                        print(f"[Influx] Writing record - count Queue: {self.queue.qsize()}", flush=True)
+
+                        debug_msg(f"[Influx] Writing record: {rec}")
+                        self._cli_influx.write_point(rec)
+
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        print(f"[Influx] Error writing record: {e}", file=sys.stderr, flush=True)
+
+            # Used broad Exception to avoid that an error in a line
+            # stops the file following. This will log the error, the thread
+            # will end and in the next watch_logs iteration it will be restarted.
             except Exception as e:  # pylint: disable=broad-exception-caught
                 print(
-                    f"[Influx] Error writing record: {e}",
+                    f"[{item.task.description}] Error processing line: {e}",
                     file=sys.stderr,
-                    flush=True,
+                    flush=True
                 )
+
             finally:
                 self.queue.task_done()
 

@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """Main entry point for the npmGrafStats log collector."""
-import sys
 import os
+import sys
 import time
 
 from config import cfg
-from tasks import TasksConfig
-from logwatcher import LogWatcherManager
 from connector.influx import InfluxClient
 from connector.influx.exceptions import InfluxClientConfigError
 from connector.influx.fake_server import FakeInfluxServer
+from logwatcher import LogWatcherManager
 from npm.simulator.log_generator import NginxLogGenerator
-from utils import debug_msg, env_bool
+from tasks import TasksConfig
+from utils import debug_msg, env_bool, env_int, parse_float
+
 
 def test_connection(cli_influx: InfluxClient) -> bool:
     """Test connection to InfluxDB."""
@@ -42,28 +43,32 @@ def test_connection(cli_influx: InfluxClient) -> bool:
 def run() -> int:
     """Main function to start log watchers based on configuration."""
 
-    fake_server_debug = env_bool("DEBUG_SERVER_INFLUX_FAKE", cfg.debug)
-    npm_log_fake_clients = env_bool("NPM_LOG_FAKE_CLIENTS", fake_server_debug)
-    npm_log_fake_clients_debug = env_bool("NPM_LOG_FAKE_CLIENTS_DEBUG", cfg.debug)
-    npm_log_fake_clients_file = os.getenv("NPM_LOG_FAKE_CLIENTS_FILE", "")
+    fake_server_enable = env_bool("FAKE_SERVER", False)
+    fake_server_debug = env_bool("FAKE_SERVER_DEBUG", cfg.debug)
 
+    fake_client_enable = env_bool("FAKE_CLIENT", False)
+    fake_client_debug = env_bool("FAKE_CLIENT_DEBUG", cfg.debug)
+    fake_client_file = os.getenv("FAKE_CLIENT_FILE", "")
+    fake_client_interval: float =  parse_float(os.getenv("FAKE_CLIENT_INTERVAL", None), 5.0)
+    fake_client_min_batch: int =   env_int("FAKE_CLIENT_MIN_BATCH", 1, 1)
+    fake_client_max_batch: int =  env_int("FAKE_CLIENT_MAX_BATCH", 8, 1)
 
     url = cfg.influxdb['url']
 
     fake_server : FakeInfluxServer | None = None
     fake_clients : NginxLogGenerator | None = None
 
-    if url == "fake":
+    if url == "fake" or fake_server_enable:
         fake_server = FakeInfluxServer(debug=fake_server_debug)
         fake_server.start()
         url = fake_server.url
 
-        if npm_log_fake_clients:
-            fake_clients = NginxLogGenerator(debug=npm_log_fake_clients_debug)
-            fake_clients.output = npm_log_fake_clients_file
-            fake_clients.base_interval = 5.0 # seconds
-            fake_clients.min_batch = 1
-            fake_clients.max_batch = 5
+    if fake_client_enable:
+        fake_clients = NginxLogGenerator(debug=fake_client_debug)
+        fake_clients.output = fake_client_file
+        fake_clients.base_interval = fake_client_interval # seconds
+        fake_clients.min_batch = fake_client_min_batch
+        fake_clients.max_batch = fake_client_max_batch
 
     cli_influx = InfluxClient.create(
         url=url,

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from typing import Iterable, Literal
-from tasks import LogTask, LineProcessor, ListEnabled, DiscoveryInfo
-from connector.influx import InfluxRecord
+
 from config import GlobalConfig
-from .types import LogKind
+from connector.influx import InfluxRecord
+from tasks import DiscoveryInfo, LineProcessor, ListEnabled, LogTask
+
 from .config import LogsPaths, NpmConfig
 from .handlers import handle_line
-
+from .types import LogKind
 
 __version__ = "1.0.0"
 __description__ = "Nginx Proxy Manager integration"
