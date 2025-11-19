@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """ Handles log lines related to reverse proxies and redirections. """
 from __future__ import annotations
+
+import ipaddress
 import re
 import sys
-import ipaddress
-from typing import TypedDict, Optional
 from dataclasses import dataclass
-from config import GlobalConfig
-from utils import debug_msg, is_ip_in_range, format_time, TypeRegex, Regex, parse_float
-from connector.influx import InfluxRecord
+from typing import Optional, TypedDict
+
 from api.external.abuseipdb import AbuseIPDB, AbuseIPDBStatusReturn
 from api.external.geoip2 import GeoIP2Client
+from api.external.geoip2.exceptions import GeoIP2ConfigError
+from config import GlobalConfig
+from connector.influx import InfluxRecord
+from utils import (Regex, TypeRegex, debug_msg, format_time, is_ip_in_range,
+                   parse_float)
+
 from .types import LogKind, TypeSendRecord
+
 
 @dataclass
 class ParsedRecord:
@@ -150,16 +156,28 @@ class HandlersNPM:
 
     def _get_geoip2city(self, ip: str) -> dict[str, str | float]:
         """ Returns a GeoIP2Client instance. """
-        db = self.config.geo_city_db_path
-        geo_data = GeoIP2Client.get_city(ip, db, debug = self.debug, show=True)
-        geo_return  = {
-            "key": geo_data["iso_code"],
-            "City": geo_data["city"],
-            "State": geo_data["state"],
-            "Name": geo_data["country"],
-            "latitude": parse_float(geo_data["latitude"], 0.0),
-            "longitude": parse_float(geo_data["longitude"], 0.0),
-        }
+        try:
+            db = self.config.geo_city_db_path
+            geo_data = GeoIP2Client.get_city(ip, db, debug = self.debug, show=True)
+            geo_return  = {
+                "key": geo_data["iso_code"],
+                "City": geo_data["city"],
+                "State": geo_data["state"],
+                "Name": geo_data["country"],
+                "latitude": parse_float(geo_data["latitude"], 0.0),
+                "longitude": parse_float(geo_data["longitude"], 0.0),
+            }
+        except GeoIP2ConfigError as e:
+            debug_msg(f"[Warn] GeoIP2 City lookup failed for IP {ip}: {e}")
+            geo_return  = {
+                "key": "",
+                "City": "",
+                "State": "",
+                "Name": "",
+                "latitude": 0.0,
+                "longitude": 0.0,
+            }
+
         return geo_return
 
     def _get_geoip2asn(self, ip: str, asn_flag: bool) -> dict[str, object]:
@@ -167,8 +185,17 @@ class HandlersNPM:
         if not asn_flag:
             return {}
 
-        db = self.config.geo_asn_db_path
-        data = GeoIP2Client.get_asn(ip, db, debug = self.debug, show=True)
+        try:
+            db = self.config.geo_asn_db_path
+            data = GeoIP2Client.get_asn(ip, db, debug = self.debug, show=True)
+
+        except GeoIP2ConfigError as e:
+            debug_msg(f"[Warn] GeoIP2 ASN lookup failed for IP {ip}: {e}")
+            return {
+                "asn": 0,
+                "org": "",
+            }
+
         return data
 
     def _get_abuseipdb(self, ip: str) -> dict[str, int]:
@@ -215,12 +242,13 @@ class HandlersNPM:
 
             case TypeSendRecord.PUBLIC:
                 geo_city_data = self._get_geoip2city(ip)
-                tags.update(geo_city_data)
-                fields.update(geo_city_data)
+                if geo_city_data:
+                    tags.update(geo_city_data)
+                    fields.update(geo_city_data)
 
-                # For tags, use string values for lat/lon
-                tags["latitude"] = str(tags['latitude'])
-                tags["longitude"] = str(tags['longitude'])
+                    # For tags, use string values for lat/lon
+                    tags["latitude"] = str(tags['latitude'])
+                    tags["longitude"] = str(tags['longitude'])
 
                 asn_data = self._get_geoip2asn(ip, asn_flag)
                 if asn_data:

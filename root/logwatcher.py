@@ -18,6 +18,15 @@ from utils import debug_msg
 TAIL_POLL_INTERVAL = 0.2   # seconds between checks for new lines in follow_file
 SCAN_INTERVAL = 5.0        # seconds between scans for new log files in watch_logs
 
+
+# Autoscaling writer thread parameters
+MIN_WRITERS = 4
+MAX_WRITERS = 48
+HIGH_Q = 100      # if exceeds this, add more writer threads
+LOW_Q  = 100      # if below this, remove writer threads
+SENTINEL = object()  # marker to signal writer threads to stop
+
+
 @dataclass
 class QueueItem:
     """Item in the log processing queue."""
@@ -36,9 +45,11 @@ class LogWatcherManager:
         self.threads: list[threading.Thread] = []
         self._running = False
 
-        # started[description][path] = Thread
         self._started: dict[str, dict[str, threading.Thread]] = {}
         self._lock = threading.Lock()
+
+        self._writer_threads: list[threading.Thread] = []
+        self._writer_id = 0
 
     # --- Public methods ---
     def start(self) -> None:
@@ -47,14 +58,15 @@ class LogWatcherManager:
             return
         self._running = True
 
-        # Writer InfluxDB thread
-        writer_thread = threading.Thread(
-            target=self._writer_loop,
-            daemon=True,
-            name="influx-writer",
-        )
-        writer_thread.start()
-        self.threads.append(writer_thread)
+        # Autoscaling writers (influx and processing)
+        for _ in range(MIN_WRITERS):
+            self._start_writer()
+
+        threading.Thread(
+            target=self._autoscaler_loop,
+            name="influx-writer-autoscaler",
+            daemon=True
+        ).start()
 
         # Watchers
         for task in list(self._tasks.tasks):
@@ -119,24 +131,59 @@ class LogWatcherManager:
             print(f"[{task.description}] Error following {path}: {e}", file=sys.stderr, flush=True)
 
 
+    def _autoscaler_loop(self) -> None:
+        """Autoscaler loop to adjust the number of writer threads based on queue size."""
+
+        while not self.stop_event.is_set():
+            q = self.queue.qsize()
+            n = len(self._writer_threads)
+
+            # scale up
+            if q > HIGH_Q and n < MAX_WRITERS:
+                print(f"[Autoscaler] Scaling up writers: Queue={q}, Writers={n} -> {n+1}", flush=True)
+                self._start_writer()
+
+            # scale down
+            elif q < LOW_Q and n > MIN_WRITERS:
+                print(f"[Autoscaler] Scaling down writers: Queue={q}, Writers={n} -> {n-1}", flush=True)
+                # send a sentinel -> one writer will stop itself
+                self.queue.put(SENTINEL)
+                # optional: clean up dead threads
+                self._writer_threads = [t for t in self._writer_threads if t.is_alive()]
+
+            time.sleep(1)
+
+    def _start_writer(self):
+        name = f"writer-thread-{self._writer_id}"
+        self._writer_id += 1
+        t = threading.Thread(target=self._writer_loop, name=name, daemon=True)
+        t.start()
+        self._writer_threads.append(t)
+
+
     def _writer_loop(self) -> None:
         """Single writer thread that consumes records from the queue and writes to InfluxDB."""
-        debug_msg("[Influx] Writer thread started.")
+        name = threading.current_thread().name
+        debug_msg(f"[{name}] Writer thread started.")
+        print(f"[{name}] Writer thread started.", flush=True)
         while not self.stop_event.is_set() or not self.queue.empty():
             try:
                 item: QueueItem = self.queue.get(timeout=0.5)
             except Empty:
                 continue
 
+            # petición de parada para este hilo
+            if item is SENTINEL:
+                self.queue.task_done()
+                print(f"[{name}] Writer thread stopping on sentinel.", flush=True)
+                break
+
             try:
                 records: list[InfluxRecord] = item.task.processor(item.line)
-
-                # TODO: Debug Speed test
-                print(f"[{item.task.description}] Generated {len(records)} records from line.", flush=True)
                 for rec in records:
                     try:
                         # TODO: Debug Speed test
-                        print(f"[Influx] Writing record - count Queue: {self.queue.qsize()}", flush=True)
+                        # print(f"[Influx] Writing record - Queue: {self.queue.qsize()} - Threads: {len(self._writer_threads)}", flush=True)
 
                         debug_msg(f"[Influx] Writing record: {rec}")
                         self._cli_influx.write_point(rec)
@@ -153,6 +200,7 @@ class LogWatcherManager:
                     file=sys.stderr,
                     flush=True
                 )
+                print(item.line, file=sys.stderr, flush=True)
 
             finally:
                 self.queue.task_done()

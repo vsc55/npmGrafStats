@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """ Generte log type Nginx (combined + host) in background. """
 import random
-import time
 import threading
-from typing import List
+import time
 from pathlib import Path
+from typing import List
 
 
 class NginxLogGenerator:
@@ -149,6 +149,8 @@ class NginxLogGenerator:
             return f"{o1}.{o2}.{o3}.{o4}"
 
     def _get_client_ip(self) -> str:
+        # return self._rand_public_ip()
+    
         # 70% already seen IP ("loyal" client), 30% new
         if self._client_ips and random.random() < 0.7:
             return random.choice(self._client_ips)
@@ -332,6 +334,8 @@ class NginxLogGenerator:
                 # small pauses within the burst
                 if random.random() < 0.2:
                     time.sleep(random.uniform(0.01, 0.05))
+
+            print(f"[FakeLogGen] Generated batch of {batch_size} lines.", flush=True)
 
             # average interval with jitter
             sleep_time = random.uniform(
