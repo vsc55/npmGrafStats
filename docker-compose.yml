@@ -36,16 +36,24 @@ services:
       - ./mysql:/var/lib/mysql
 
   npmgraf:
-    image: vsc55/npmgrafstats:latest # change to ghcr.io/smilebasti/npmgrafstats if you prefer Github Container Registry
+    image: vsc55/npmgraf:test
     restart: unless-stopped
     environment:
-      REDIRECTION_LOGS: '<set TRUE or FALSE or ONLY>' # TRUE or FALSE or ONLY
-      INTERNAL_LOGS: '<set TRUE or FALSE>' # see Github wiki for more information
-      MONITORING_LOGS: '<set TRUE or FALSE>' # see Github wiki for more information
-      INFLUX_HOST: 'http://influxdb:8086' # use host IP if necessary
-      INFLUX_BUCKET: 'npmgrafstats'
-      INFLUX_ORG: 'npmgrafstats'
-      INFLUX_TOKEN: '<replace>' # REQUIRED! insert after first run and manual token creation
+      DEBUG: false
+      
+      INFLUX_URL: "http://influxdb:8086"
+      INFLUX_ORG: "${INFLUX_ORG}"
+      INFLUX_BUCKET: "${INFLUX_BUCKET}"
+      INFLUX_TOKEN: "${INFLUXDB_ADMIN_TOKEN}"
+      INFLUX_RETRY_CONNECT: 10
+      INFLUX_RETRY_DELAY: 5
+      ABUSEIP_KEY: "${ABUSEIP_KEY}"
+
+      PROXY_LOGS: "TRUE"
+      REDIRECT_LOGS: "TRUE"
+      MONITORING_LOGS: "TRUE"
+      INTERNAL_LOGS: "TRUE"
+      PUBLIC_LOGS: "TRUE"
     volumes:
       - ./data/logs:/logs
       - ./geolite:/geolite
@@ -58,11 +66,12 @@ services:
     image: influxdb:2.7-alpine
     restart: unless-stopped
     environment:
-      DOCKER_INFLUXDB_INIT_MODE: 'setup'
-      DOCKER_INFLUXDB_INIT_USERNAME: '<replace>'
-      DOCKER_INFLUXDB_INIT_PASSWORD: '<replace>' # atleast 8 characters
-      DOCKER_INFLUXDB_INIT_ORG: 'npmgrafstats'
-      DOCKER_INFLUXDB_INIT_BUCKET: 'npmgrafstats'
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUX_ORG}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUX_BUCKET}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
     volumes:
       # Mount for influxdb data directory and configuration
       - ./influxdbv2:/var/lib/influxdb2

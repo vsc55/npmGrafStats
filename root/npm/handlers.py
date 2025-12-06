@@ -282,7 +282,8 @@ class HandlersNPM:
         tags = {
             "Domain": domain,
             "IP": ip,
-            "Target": target_ip
+            "Target": target_ip,
+            "StatusCode": status_code,
         }
         fields = tags.copy()
         fields.update({
