@@ -52,6 +52,34 @@ class HandlersNPM:
         if line is None:
             line = self.line
 
+
+        log_regex = re.compile(
+            r'^\[(?P<time_local>[^\]]+)\]\s+'
+            r'(?:(?P<upstream_cache_status>\S+)\s+(?P<upstream_status>\S+)\s+)?'  # opcional (proxy)
+            r'(?P<status>\d{3})\s+-\s+'
+            r'(?P<method>\S+)\s+'
+            r'(?P<scheme>\S+)\s+'
+            r'(?P<host>\S+)\s+'
+            r'"(?P<uri>[^"]+)"\s+'
+            r'\[Client\s+(?P<client>[^\]]+)\]\s+'
+            r'\[Length\s+(?P<length>[^\]]+)\]\s+'
+            r'\[Gzip\s+(?P<gzip>[^\]]+)\]'
+            r'(?:\s+\[Sent-to\s+(?P<sent_to>[^\]]+)\])?\s*'  # opcional (solo proxy)
+            r'"(?P<user_agent>[^"]*)"\s+'
+            r'"(?P<referer>[^"]*)"'
+        )
+
+        data: dict[str, str] = {}
+        m = log_regex.match(line)
+        if m:
+            data = m.groupdict()
+            # print(data)
+
+        method = data.get("method", "")
+        scheme = data.get("scheme", "")
+        uri = data.get("uri", "")
+        agent = data.get("user_agent", "")
+
         outside_ip, target_ip = self.extract_ips(line)
         return {
             "outside_ip": outside_ip,
@@ -60,6 +88,10 @@ class HandlersNPM:
             "length": self.extract_length(line),
             "measurement_time": self.extract_measurement_time(line),
             "status_code": self.extract_status_code(line),
+            "method": method,
+            "scheme": scheme,
+            "uri": uri,
+            "agent": agent,
         }
 
 
@@ -241,6 +273,10 @@ class HandlersNPM:
         target_ip = record.get("target_ip", "")
         asn_flag = record.get("asn", False)
         status_code: int | None = record.get("status_code", None)
+        method: str = record.get("method", "")
+        scheme: str = record.get("scheme", "")
+        uri: str = record.get("uri", "")
+        agent: str = record.get("agent", "")
 
         # Set default values for tags and fields
         tags = {
@@ -252,6 +288,10 @@ class HandlersNPM:
         fields.update({
             "length": length,
             "statuscode": status_code,
+            "method": method,
+            "scheme": scheme,
+            "uri": uri,
+            "agent": agent,
             "metric": 1
         })
 
@@ -299,13 +339,11 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
     domain = result_line["domain"]
     length = result_line["length"]
     measurement_time = result_line["measurement_time"]
-    status_code: str = result_line["status_code"]
 
     debug_msg(
         f"[DEBUG] Parsed line - outside_ip: {outside_ip}, "
         f"target_ip: {target_ip}, domain: {domain}, "
-        f"length: {length}, measurement_time: {measurement_time}, "
-        f"statuscode: {status_code}"
+        f"length: {length}, measurement_time: {measurement_time}"
     )
 
     if not outside_ip:
@@ -381,7 +419,11 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
         "length": rec_length,
         "target_ip": rec_target,
         "asn": rec_asn,
-        "status_code": status_code
+        "status_code": result_line["status_code"],
+        "method": result_line["method"],
+        "scheme": result_line["scheme"],
+        "uri": result_line["uri"],
+        "agent": result_line["agent"],
     }
 
     rec = handlers.parse_send_record(send_type, send_record)

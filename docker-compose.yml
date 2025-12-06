@@ -36,7 +36,7 @@ services:
       - ./mysql:/var/lib/mysql
 
   npmgraf:
-    image: smilebasti/npmgrafstats:latest # change to ghcr.io/smilebasti/npmgrafstats if you prefer Github Container Registry
+    image: vsc55/npmgrafstats:latest # change to ghcr.io/smilebasti/npmgrafstats if you prefer Github Container Registry
     restart: unless-stopped
     environment:
       REDIRECTION_LOGS: '<set TRUE or FALSE or ONLY>' # TRUE or FALSE or ONLY
