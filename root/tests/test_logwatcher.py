@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 import os
-import time
 import threading
+import time
 from pathlib import Path
 
-import pytest
+from logwatcher import LogTask, LogWatcherManager, QueueItem
 
-from logwatcher import LogWatcherManager, LogTask
 
 class FakeInfluxClient:
-    """Cliente Influx falso para testear las escrituras."""
+    """Fake Influx client to test writing records."""
     def __init__(self):
         self.records = []
 
     def write_point(self, rec):
+        """Simulate writing a point to InfluxDB by storing it in a list."""
         self.records.append(rec)
 
 
@@ -25,17 +25,26 @@ def test_writer_loop_writes_records_to_influx():
     cli = FakeInfluxClient()
     mgr = LogWatcherManager(tasks=[], cli_influx=cli)
 
+    class FakeTask:
+        """ Task Facke to simulate log processing. """
+        description = "fake-task"
+
+        def processor(self, line: str):
+            """ the return value of processor is what is sent to write_point, so"""
+            return [line]
+
     # Put a "record" in the queue
-    mgr.queue.put("record-1")
+    item = QueueItem(task=FakeTask(), line="record-1")
+    mgr.queue.put(item)
+
     # Set stop_event so it exits when the queue is empty
     mgr.stop_event.set()
 
-    t = threading.Thread(target=mgr._writer_loop)
+    t = threading.Thread(target=mgr._writer_loop, name="writer-test")
     t.start()
     t.join(timeout=1.0)
 
     assert cli.records == ["record-1"]
-
 
 def test_follow_file_processes_new_lines(tmp_path: Path):
     """Test that following a file processes new lines added to it."""
@@ -63,13 +72,25 @@ def test_follow_file_processes_new_lines(tmp_path: Path):
     )
     mgr = LogWatcherManager(tasks=[task], cli_influx=cli)
 
-    # Launch the follower in a thread
-    t = threading.Thread(
-        target=mgr._follow_file,
-        args=(str(log_file), task),
+
+    # Launch writer loop
+    writer_thread = threading.Thread(
+        target=mgr._writer_loop,
+        name="writer-thread-test",
         daemon=True,
     )
-    t.start()
+    writer_thread.start()
+
+
+    # Launch the follower in a thread
+    follower_thread  = threading.Thread(
+        target=mgr._follow_file,
+        args=(str(log_file), task),
+        name="follower-thread-test",
+        daemon=True,
+    )
+    follower_thread .start()
+
 
     # Give a small margin for it to seek to the end
     time.sleep(0.1)
@@ -82,18 +103,18 @@ def test_follow_file_processes_new_lines(tmp_path: Path):
 
     # Wait for the follower to put something in the queue
     start = time.time()
-    while time.time() - start < 2.0 and mgr.queue.empty():
+    timeout = 2.0
+    while time.time() - start < timeout and not processed_records:
         time.sleep(0.05)
 
     mgr.stop_event.set()
-    t.join(timeout=1.0)
+    writer_thread.join(timeout=1.0)
+    follower_thread.join(timeout=1.0)
 
+    # Check
     assert processed_records == ["rec:hello world"]
-    # The queue should contain the same "record"
-    assert not mgr.queue.empty()
-    rec = mgr.queue.get_nowait()
-    assert rec == "rec:hello world"
-
+    assert cli.records == ["rec:hello world"]
+    
 
 def test_started_paths_snapshot_return_immutable_copy():
     """Test that started_paths_snapshot returns an independent copy of started paths."""

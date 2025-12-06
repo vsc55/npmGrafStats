@@ -122,7 +122,7 @@ class LogWatcherManager:
                         time.sleep(TAIL_POLL_INTERVAL)
                         continue
 
-                    self.queue.put(QueueItem(line=line, task=task))    
+                    self.queue.put(QueueItem(line=line, task=task))
 
         except FileNotFoundError:
             print(f"[{task.description}] {path} disappeared", file=sys.stderr, flush=True)
@@ -140,12 +140,18 @@ class LogWatcherManager:
 
             # scale up
             if q > HIGH_Q and n < MAX_WRITERS:
-                print(f"[Autoscaler] Scaling up writers: Queue={q}, Writers={n} -> {n+1}", flush=True)
+                print(
+                    f"[Autoscaler] Scaling up writers: Queue={q}, Writers={n} -> {n+1}",
+                    flush=True
+                )
                 self._start_writer()
 
             # scale down
             elif q < LOW_Q and n > MIN_WRITERS:
-                print(f"[Autoscaler] Scaling down writers: Queue={q}, Writers={n} -> {n-1}", flush=True)
+                print(
+                    f"[Autoscaler] Scaling down writers: Queue={q}, Writers={n} -> {n-1}",
+                    flush=True
+                )
                 # send a sentinel -> one writer will stop itself
                 self.queue.put(SENTINEL)
                 # optional: clean up dead threads
@@ -178,12 +184,26 @@ class LogWatcherManager:
                 print(f"[{name}] Writer thread stopping on sentinel.", flush=True)
                 break
 
+
+            # Validate if the item has the expected attributes
+            if not hasattr(item, "task") or not hasattr(item, "line"):
+                print(
+                    f"[{name}] Invalid item in queue: {type(item)!r} {item!r}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                # skip processing, the finally will do task_done()
+                continue
+
             try:
                 records: list[InfluxRecord] = item.task.processor(item.line)
                 for rec in records:
                     try:
                         # TODO: Debug Speed test
-                        # print(f"[Influx] Writing record - Queue: {self.queue.qsize()} - Threads: {len(self._writer_threads)}", flush=True)
+                        # print(
+                        #   f"[Influx] Writing record - Queue: {self.queue.qsize()} - Threads: {len(self._writer_threads)}",
+                        #   flush=True
+                        # )
 
                         debug_msg(f"[Influx] Writing record: {rec}")
                         self._cli_influx.write_point(rec)
@@ -195,12 +215,15 @@ class LogWatcherManager:
             # stops the file following. This will log the error, the thread
             # will end and in the next watch_logs iteration it will be restarted.
             except Exception as e:  # pylint: disable=broad-exception-caught
+                task_desc = getattr(getattr(item, "task", None), "description", "UNKNOWN_TASK")
+                line_text = getattr(item, "line", repr(item))
+
                 print(
-                    f"[{item.task.description}] Error processing line: {e}",
+                    f"[{task_desc}] Error processing line: {e}",
                     file=sys.stderr,
                     flush=True
                 )
-                print(item.line, file=sys.stderr, flush=True)
+                print(line_text, file=sys.stderr, flush=True)
 
             finally:
                 self.queue.task_done()
