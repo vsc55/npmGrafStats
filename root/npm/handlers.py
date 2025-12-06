@@ -253,11 +253,11 @@ class HandlersNPM:
         abuse_key = self.config.api_abuseip_key
         abuse_result = AbuseIPDB.check(ip, key=abuse_key, debug=self.debug, show=True)
         if abuse_result["status"] is AbuseIPDBStatusReturn.SUCCESS:
-            abuse_confidence_score = abuse_result["data"].get("abuseConfidenceScore") or 0
-            abuse_total_reports = abuse_result["data"].get("totalReports") or 0
+            abuse_confidence_score = abuse_result["data"].get("abuseConfidenceScore", 0)
+            abuse_total_reports = abuse_result["data"].get("totalReports", 0)
             abuse_return = {
-                "abuseConfidenceScore": abuse_confidence_score,
-                "totalReports": abuse_total_reports,
+                "abuseConfidenceScore": str(abuse_confidence_score),
+                "totalReports": str(abuse_total_reports),
             }
             return abuse_return
 
