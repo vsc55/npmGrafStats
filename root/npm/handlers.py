@@ -10,7 +10,7 @@ from typing import Optional, TypedDict
 
 from api.external.abuseipdb import AbuseIPDB, AbuseIPDBStatusReturn
 from api.external.geoip2 import GeoIP2Client
-from api.external.geoip2.exceptions import GeoIP2ConfigError
+from api.external.geoip2.exceptions import GeoIP2ConfigError, GeoIP2PathDBError
 from config import GlobalConfig
 from connector.influx import InfluxRecord
 from utils import (Regex, TypeRegex, debug_msg, format_time, is_ip_in_range,
@@ -59,8 +59,23 @@ class HandlersNPM:
             "domain": self.extract_domain(line),
             "length": self.extract_length(line),
             "measurement_time": self.extract_measurement_time(line),
+            "status_code": self.extract_status_code(line),
         }
 
+
+    def extract_status_code(self, line: Optional[str] = None) -> int | None:
+        """
+        Extracts the status code from the log line.
+        """
+        if line is None:
+            line = self.line
+
+        parts: list[str] = line.strip().split()
+        if len(parts) >= 4:
+            m = re.search(r"\d+", parts[3])
+            if m:
+                return int(m.group(0))
+        return None
 
     def extract_ips(self, line: Optional[str] = None) -> tuple[str | None, str | None]:
         """
@@ -95,7 +110,7 @@ class HandlersNPM:
         if line is None:
             line = self.line
 
-        parts = line.split()
+        parts = line.strip().split()
         if len(parts) >= 14:
             m = re.search(r"\d+", parts[13])
             if m:
@@ -156,10 +171,11 @@ class HandlersNPM:
 
     def _get_geoip2city(self, ip: str) -> dict[str, str | float]:
         """ Returns a GeoIP2Client instance. """
+
         try:
             db = self.config.geo_city_db_path
             geo_data = GeoIP2Client.get_city(ip, db, debug = self.debug, show=True)
-            geo_return  = {
+            geo_return: dict[str, str | float] = {
                 "key": geo_data["iso_code"],
                 "City": geo_data["city"],
                 "State": geo_data["state"],
@@ -167,16 +183,18 @@ class HandlersNPM:
                 "latitude": parse_float(geo_data["latitude"], 0.0),
                 "longitude": parse_float(geo_data["longitude"], 0.0),
             }
-        except GeoIP2ConfigError as e:
-            debug_msg(f"[Warn] GeoIP2 City lookup failed for IP {ip}: {e}")
-            geo_return  = {
-                "key": "",
-                "City": "",
-                "State": "",
-                "Name": "",
-                "latitude": 0.0,
-                "longitude": 0.0,
-            }
+
+        except (GeoIP2PathDBError, GeoIP2ConfigError) as e:
+            print(f"[Warn] GeoIP2 City lookup failed for IP {ip}: {e}", file=sys.stderr, flush=True)
+            geo_return = {}
+            # geo_return : dict[str, str | float] = {
+            #     "key": "",
+            #     "City": "",
+            #     "State": "",
+            #     "Name": "",
+            #     "latitude": 0.0,
+            #     "longitude": 0.0
+            # }
 
         return geo_return
 
@@ -189,11 +207,11 @@ class HandlersNPM:
             db = self.config.geo_asn_db_path
             data = GeoIP2Client.get_asn(ip, db, debug = self.debug, show=True)
 
-        except GeoIP2ConfigError as e:
-            debug_msg(f"[Warn] GeoIP2 ASN lookup failed for IP {ip}: {e}")
+        except (GeoIP2PathDBError, GeoIP2ConfigError) as e:
+            print(f"[Warn] GeoIP2 ASN lookup failed for IP {ip}: {e}", file=sys.stderr, flush=True)
             return {
                 "asn": 0,
-                "org": "",
+                "org": "Unknown",
             }
 
         return data
@@ -222,6 +240,7 @@ class HandlersNPM:
         length = int(record.get("length", 0))
         target_ip = record.get("target_ip", "")
         asn_flag = record.get("asn", False)
+        status_code: int | None = record.get("status_code", None)
 
         # Set default values for tags and fields
         tags = {
@@ -231,7 +250,8 @@ class HandlersNPM:
         }
         fields = tags.copy()
         fields.update({
-            "duration": length,
+            "length": length,
+            "statuscode": status_code,
             "metric": 1
         })
 
@@ -279,11 +299,13 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
     domain = result_line["domain"]
     length = result_line["length"]
     measurement_time = result_line["measurement_time"]
+    status_code: str = result_line["status_code"]
 
     debug_msg(
         f"[DEBUG] Parsed line - outside_ip: {outside_ip}, "
         f"target_ip: {target_ip}, domain: {domain}, "
-        f"length: {length}, measurement_time: {measurement_time}"
+        f"length: {length}, measurement_time: {measurement_time}, "
+        f"statuscode: {status_code}"
     )
 
     if not outside_ip:
@@ -359,6 +381,7 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
         "length": rec_length,
         "target_ip": rec_target,
         "asn": rec_asn,
+        "status_code": status_code
     }
 
     rec = handlers.parse_send_record(send_type, send_record)
