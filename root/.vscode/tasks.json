@@ -1,0 +1,22 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup venv",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy","Bypass","-File","${workspaceFolder}/setup_env.ps1"],
+      "runOptions": { "runOn": "folderOpen" },
+      "problemMatcher": []
+    },
+    {
+      "label": "flake8 full",
+      "type": "shell",
+      "command": ".venv/Scripts/python.exe",
+      "args": ["-m", "flake8", "."],
+      "problemMatcher": [
+        "$flake8"
+      ]
+    }
+  ]
+}
