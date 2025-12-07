@@ -6,6 +6,9 @@ import time
 from pathlib import Path
 from typing import List
 
+from logger import get_logger
+
+log = get_logger(__name__)
 
 class NginxLogGenerator:
     """
@@ -14,7 +17,6 @@ class NginxLogGenerator:
     Formato aproximado:
     $host $remote_addr - - [time_local] "METHOD URI HTTP/x.x" status size "ref" "ua"
     """
-    debug: bool = False
 
     HOSTS = [
         "www.ejemplo.com",
@@ -90,8 +92,7 @@ class NginxLogGenerator:
 
     _output: str = ""
 
-    def __init__(self, output: str = "", debug: bool = False):
-        self.debug = debug
+    def __init__(self, output: str = ""):
         self.output = output
         self.base_interval = 1.0
         self.min_batch = 1
@@ -150,7 +151,7 @@ class NginxLogGenerator:
 
     def _get_client_ip(self) -> str:
         # return self._rand_public_ip()
-    
+
         # 70% already seen IP ("loyal" client), 30% new
         if self._client_ips and random.random() < 0.7:
             return random.choice(self._client_ips)
@@ -335,7 +336,7 @@ class NginxLogGenerator:
                 if random.random() < 0.2:
                     time.sleep(random.uniform(0.01, 0.05))
 
-            print(f"[FakeLogGen] Generated batch of {batch_size} lines.", flush=True)
+            log.info("Generated batch of %s lines.", batch_size)
 
             # average interval with jitter
             sleep_time = random.uniform(
@@ -347,11 +348,10 @@ class NginxLogGenerator:
 
     def _write_line(self, line: str):
         if self.output == "":
-            print("[FakeLogGen] Output file not set.", flush=True)
+            log.warning("Output file not set. Cannot write log line.")
             return
 
-        if self.debug:
-            print(f"[FakeLogGen] {line.strip()}", flush=True)
+        log.debug("[FakeLogGen] %s", line.strip())
 
         with open(self.output, "a", encoding="utf-8") as f:
             f.write(line)
@@ -364,7 +364,7 @@ class NginxLogGenerator:
             return
 
         if not self.output:
-            print("[FakeLogGen] Output file not set. Cannot start.", flush=True)
+            log.warning("Output file not set. Cannot start.")
             return
 
         self._running = True
@@ -375,8 +375,7 @@ class NginxLogGenerator:
 
         self._thread.start()
 
-        if self.debug:
-            print("[FakeLogGen] Starting log generation...", flush=True)
+        log.debug("[FakeLogGen] Starting log generation...")
 
 
     def stop(self):
@@ -386,8 +385,7 @@ class NginxLogGenerator:
             self._thread.join()
             self._thread = None
 
-        if self.debug:
-            print("[FakeLogGen] Stopping log generation...", flush=True)
+        log.debug("[FakeLogGen] Stopping log generation...")
 
 if __name__ == "__main__":
     # quick example

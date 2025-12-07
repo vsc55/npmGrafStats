@@ -4,6 +4,9 @@ import time
 from typing import Optional
 from urllib.request import urlopen
 
+from logger import get_logger
+
+log = get_logger(__name__)
 
 class ExternalIP:
     """Class to manage external IP detection with caching and TTL."""
@@ -16,6 +19,7 @@ class ExternalIP:
         try:
             with urlopen("https://ifconfig.me/ip", timeout=5) as response:
                 ip = response.read().decode("utf-8").strip()
+                log.debug("Detected external IP: %s", ip)
                 return ip or None
 
         except Exception as e:

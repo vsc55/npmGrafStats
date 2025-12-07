@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import os
 from types import SimpleNamespace
-import pytest
-import maxminddb
+
 import geoip2.errors
-from api.external.geoip2 import GeoIP2Client
-from api.external.geoip2.exceptions import GeoIP2PathDBError, GeoIP2ConfigError
+import maxminddb
+import pytest
+
 from api.external import geoip2 as geoip2_module
+from api.external.geoip2 import GeoIP2Client
+from api.external.geoip2.exceptions import GeoIP2ConfigError, GeoIP2PathDBError
 
 # ---- Class Dummy Readers ----
 
@@ -351,8 +353,6 @@ def test_get_city_wrapper_uses_client(monkeypatch):
     result = GeoIP2Client.get_city(
         ip="5.6.7.8",
         db="/fake/path/GeoLite2-City.mmdb",
-        debug=False,
-        show=False,
     )
 
     assert result["status"] == "success"
@@ -368,30 +368,12 @@ def test_get_asn_wrapper_uses_client(monkeypatch):
     result = GeoIP2Client.get_asn(
         ip="9.9.9.9",
         db="/fake/path/GeoLite2-ASN.mmdb",
-        debug=False,
-        show=False,
     )
 
     assert result["status"] == "success"
     assert result["ip"] == "9.9.9.9"
     assert result["asn"] == "64512"
     assert result["org"] == "Example ISP"
-
-
-def test_debug_prints_city_result(monkeypatch, capsys):
-    """ Test that enabling debug causes city() to print the result. """
-    client = GeoIP2Client()
-    client.ip = "1.2.3.4"
-    client.debug = True
-
-    monkeypatch.setattr(os.path, "isfile", lambda p: True)
-    client.city_db_path = "/fake/path/GeoLite2-City.mmdb"
-
-    monkeypatch.setattr(geoip2_module.geoip2.database, "Reader", DummyCityReader)
-
-    _ = client.city()
-    out = capsys.readouterr().out
-    assert "[GeoIP2] City result:" in out
 
 
 def test_get_citys_with_multiple_ips(monkeypatch):
@@ -406,8 +388,6 @@ def test_get_citys_with_multiple_ips(monkeypatch):
     results = GeoIP2Client.get_citys(
         ips=ips,
         db="/fake/path/GeoLite2-City.mmdb",
-        debug=False,
-        show=False
     )
 
     # One entry per IP address must be returned
@@ -472,8 +452,6 @@ def test_get_asns_with_multiple_ips(monkeypatch):
     results = GeoIP2Client.get_asns(
         ips=ips,
         db="/fake/path/GeoLite2-ASN.mmdb",
-        debug=False,
-        show=False
     )
 
     # One entry per IP address must be returned

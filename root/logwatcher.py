@@ -12,8 +12,10 @@ from queue import Empty, Queue
 from typing import Optional
 
 from connector.influx import InfluxClient, InfluxRecord
+from logger import get_logger
 from tasks import LogTask, TasksConfig
-from utils import debug_msg
+
+log = get_logger(__name__)
 
 TAIL_POLL_INTERVAL = 0.2   # seconds between checks for new lines in follow_file
 SCAN_INTERVAL = 5.0        # seconds between scans for new log files in watch_logs
@@ -86,16 +88,16 @@ class LogWatcherManager:
         if not self._running:
             return
 
-        print("[STOP] Stopping all log threads...", flush=True)
+        log.info("[STOP] Stopping all log threads...")
         self.stop_event.set()
 
         for t in self.threads:
-            print(f"[STOP] Joining thread: {t.name} (alive={t.is_alive()})", flush=True)
+            log.info("[STOP] Joining thread: %s (alive=%s)", t.name, t.is_alive())
             if t.is_alive():
                 t.join()
-            print(f"[STOP] Thread finished: {t.name} (alive={t.is_alive()})", flush=True)
+            log.info("[STOP] Thread finished: %s (alive=%s)", t.name, t.is_alive())
 
-        print("[STOP] All threads stopped.", flush=True)
+        log.info("[STOP] All threads stopped.")
         self._running = False
 
 
@@ -114,7 +116,7 @@ class LogWatcherManager:
         try:
             with open(path, "r", encoding="utf-8") as f:
                 f.seek(0, os.SEEK_END)
-                debug_msg(f"[{task.description}] Following: {path}")
+                log.info("[%s] Following: %s", task.description, path)
 
                 while not self.stop_event.is_set():
                     line = f.readline()
@@ -125,11 +127,10 @@ class LogWatcherManager:
                     self.queue.put(QueueItem(line=line, task=task))
 
         except FileNotFoundError:
-            print(f"[{task.description}] {path} disappeared", file=sys.stderr, flush=True)
+            log.error("[%s] File disappeared: %s", task.description, path)
 
         except Exception as e:  # pylint: disable=broad-exception-caught
-            print(f"[{task.description}] Error following {path}: {e}", file=sys.stderr, flush=True)
-
+            log.error("[%s] Error following %s: %s", task.description, path, e)
 
     def _autoscaler_loop(self) -> None:
         """Autoscaler loop to adjust the number of writer threads based on queue size."""
@@ -140,18 +141,13 @@ class LogWatcherManager:
 
             # scale up
             if q > HIGH_Q and n < MAX_WRITERS:
-                print(
-                    f"[Autoscaler] Scaling up writers: Queue={q}, Writers={n} -> {n+1}",
-                    flush=True
-                )
+                log.info("[Autoscaler] Scaling up writers: Queue=%d, Writers=%d -> %d", q, n, n+1)
                 self._start_writer()
 
             # scale down
             elif q < LOW_Q and n > MIN_WRITERS:
-                print(
-                    f"[Autoscaler] Scaling down writers: Queue={q}, Writers={n} -> {n-1}",
-                    flush=True
-                )
+                log.info("[Autoscaler] Scaling down writers: Queue=%d, Writers=%d -> %d", q, n, n-1)
+
                 # send a sentinel -> one writer will stop itself
                 self.queue.put(SENTINEL)
                 # optional: clean up dead threads
@@ -170,8 +166,7 @@ class LogWatcherManager:
     def _writer_loop(self) -> None:
         """Single writer thread that consumes records from the queue and writes to InfluxDB."""
         name = threading.current_thread().name
-        debug_msg(f"[{name}] Writer thread started.")
-        print(f"[{name}] Writer thread started.", flush=True)
+        log.info("[%s] Writer thread started.", name)
         while not self.stop_event.is_set() or not self.queue.empty():
             try:
                 item: QueueItem = self.queue.get(timeout=0.5)
@@ -181,17 +176,13 @@ class LogWatcherManager:
             # petición de parada para este hilo
             if item is SENTINEL:
                 self.queue.task_done()
-                print(f"[{name}] Writer thread stopping on sentinel.", flush=True)
+                log.info("[%s] Writer thread stopping on sentinel.", name)
                 break
 
 
             # Validate if the item has the expected attributes
             if not hasattr(item, "task") or not hasattr(item, "line"):
-                print(
-                    f"[{name}] Invalid item in queue: {type(item)!r} {item!r}",
-                    file=sys.stderr,
-                    flush=True,
-                )
+                log.error("[%s] Invalid item in queue: %r %r", name, type(item), item)
                 # skip processing, the finally will do task_done()
                 continue
 
@@ -205,25 +196,21 @@ class LogWatcherManager:
                         #   flush=True
                         # )
 
-                        debug_msg(f"[Influx] Writing record: {rec}")
+                        log.debug("[Influx] Writing record: %s", rec)
                         self._cli_influx.write_point(rec)
 
                     except Exception as e:  # pylint: disable=broad-exception-caught
-                        print(f"[Influx] Error writing record: {e}", file=sys.stderr, flush=True)
+                        log.error("[Influx] Error writing record: %s", e)
 
             # Used broad Exception to avoid that an error in a line
             # stops the file following. This will log the error, the thread
             # will end and in the next watch_logs iteration it will be restarted.
-            except Exception as e:  # pylint: disable=broad-exception-caught
+            except Exception:  # pylint: disable=broad-exception-caught
                 task_desc = getattr(getattr(item, "task", None), "description", "UNKNOWN_TASK")
                 line_text = getattr(item, "line", repr(item))
 
-                print(
-                    f"[{task_desc}] Error processing line: {e}",
-                    file=sys.stderr,
-                    flush=True
-                )
-                print(line_text, file=sys.stderr, flush=True)
+                log.exception("[%s] Error processing line!", task_desc)
+                log.error("Line content: %s", line_text)
 
             finally:
                 self.queue.task_done()
@@ -255,15 +242,9 @@ class LogWatcherManager:
             if last_is_enabled != task.enabled():
                 last_is_enabled = task.enabled()
                 if last_is_enabled:
-                    print(
-                        f"[{desc}] Log task is ENABLED in configuration, watching logs.",
-                        flush=True
-                    )
+                    log.info("[%s] Log task is ENABLED in configuration, watching logs.", desc)
                 else:
-                    print(
-                        f"[{desc}] Log task is DISABLED in configuration, not watching logs.",
-                        flush=True
-                    )
+                    log.info("[%s] Log task is DISABLED in configuration, not watching logs.", desc)
 
             if last_is_enabled is False:
                 time.sleep(SCAN_INTERVAL)
@@ -275,27 +256,27 @@ class LogWatcherManager:
             # Clean up finished threads
             for path, th in list(started.items()):
                 if not th.is_alive():
-                    print(f"[{desc}] Stopped following: {path} (thread ended)", flush=True)
+                    log.info("[%s] Stopped following: %s (thread ended)", desc, path)
                     self._del_started_for_path(desc, path)
 
-            debug_msg(f"[{desc}] Scanning for log files matching: {pattern}")
-            debug_msg(f"[{desc}] Already following: {len(started)} files")
+            log.debug("[%s] Scanning for log files matching: %s", desc, pattern)
+            log.debug("[%s] Already following: %d files", desc, len(started))
 
             for path in sorted(glob.glob(pattern)):
                 if not os.path.isfile(path):
-                    debug_msg(f"[{desc}] Ignoring non-regular file: {path}")
+                    log.debug("[%s] Ignoring non-regular file: %s", desc, path)
                     continue
 
                 if path in started:
                     if started[path].is_alive():
-                        debug_msg(f"[{desc}] Already following: {path}")
+                        log.debug("[%s] Already following: %s", desc, path)
                         continue
 
-                    print(f"[{desc}] Restarting following: {path}", flush=True)
+                    log.info("[%s] Restarting following: %s", desc, path)
                     self._del_started_for_path(desc, path)
 
                 else:
-                    print(f"[{desc}] Detected new log file: {path}", flush=True)
+                    log.info("[%s] Detected new log file: %s", desc, path)
 
                 t = threading.Thread(
                     target=self._follow_file,
@@ -316,16 +297,13 @@ class LogWatcherManager:
         """Kill all watch_logs threads for a given task description."""
         started = self._get_started_dict_for_task(description)
         for path, th in list(started.items()):
-            print(
-                f"[STOP][{description}] Joining follow thread for: {path} (alive={th.is_alive()})",
-                flush=True
-            )
+            log.info("[STOP][%s] Joining follow thread for: %s (alive=%s)", description, path, th.is_alive())
+
             if th.is_alive():
                 th.join(timeout=5.0)
-            print(
-                f"[STOP][{description}] Follow thread finished for: {path} (alive={th.is_alive()})",
-                flush=True
-            )
+
+            log.info("[STOP][%s] Follow thread finished for: %s (alive=%s)", description, path, th.is_alive())
+            
 
         # Clear started dict for this task
         with self._lock:

@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from typing import List
+
 from config import GlobalConfig
-from utils import debug_msg, format_time, TypeRegex, Regex
 from connector.influx import InfluxRecord
+from logger import LogLevel, get_logger
+from utils import Regex, TypeRegex, format_time
+
+log = get_logger(__name__)
 
 def _extract_ip(line: str) -> str | None:
     m = Regex.search_type(line, TypeRegex.IP)
@@ -23,17 +27,17 @@ def handle_line(line: str, env: str, config: GlobalConfig) -> List[InfluxRecord]
 
     records: list[InfluxRecord] = []
 
-    if config.debug:
-        debug_msg(f"[mod_example] Processing line: {line.strip()}")
+    if log.isEnabledFor(LogLevel.DEBUG.value):
+        log.debug("[mod_example] Processing line: %s", line.strip())
 
     env = env.lower()
     if env not in {"production", "staging"}:
-        debug_msg(f"[mod_example] Unsupported environment: {env}")
+        log.debug("[mod_example] Unsupported environment: %s", env)
         return records
 
     ip = _extract_ip(line)
     if not ip:
-        debug_msg("[mod_example] No IP found in line")
+        log.debug("[mod_example] No IP found in line")
         return records
 
     ts = _extract_measurement_time(line)

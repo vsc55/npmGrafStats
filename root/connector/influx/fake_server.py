@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Fake InfluxDB server for testing purposes."""
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import threading
 import socket
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
+from logger import get_logger
+
+log = get_logger(__name__)
 
 class FakeHTTPServer(HTTPServer):
     """HTTPServer that knows its parent FakeInfluxServer."""
@@ -36,27 +39,22 @@ class FakeInfluxHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format, *args): # pylint: disable=useless-return, redefined-builtin
-        """Override to disable logging."""
-        if getattr(self.server, "parent", None) and self.server.parent.debug:
-            super().log_message(format, *args)
-        return
+    # def log_message(self, format, *args): # pylint: disable=useless-return, redefined-builtin
+    #     """Override to disable logging."""
+    #     if getattr(self.server, "parent", None) and self.server.parent.debug:
+    #         super().log_message(format, *args)
+    #     return
 
 
 class FakeInfluxServer:
     """ A fake InfluxDB server for testing purposes. """
     def __init__(
-            self, host: str = "127.0.0.1", port: int | None = None, debug: bool = False
+            self, host: str = "127.0.0.1", port: int | None = None
     ) -> None:
-        self.debug = debug
         self.host = host
         self.port = port  # if None, choose a free one on start
         self._server: HTTPServer | None = None
         self._thread: threading.Thread | None = None
-
-    def _log(self, message: str) -> None:
-        if self.debug:
-            print(f"[FakeInfluxServer] {message}", flush=True)
 
     @staticmethod
     def _get_free_port(host: str) -> int:
@@ -92,13 +90,13 @@ class FakeInfluxServer:
 
     def start(self) -> None:
         """Start the fake InfluxDB server."""
-        self._log("Starting server...")
+        log.info("Starting server...")
         if self._server is not None:
-            self._log("Server is already running.")
+            log.warning("Server is already running.")
             return
 
         if self.port is None:
-            self._log("No port specified, selecting a free port.")
+            log.info("No port specified, selecting a free port.")
             self.port = self._get_free_port(self.host)
 
         self._server = FakeHTTPServer(
@@ -111,19 +109,19 @@ class FakeInfluxServer:
             daemon=True,
         )
         self._thread.start()
-        self._log(f"Server started at {self.url}")
+        log.info("Server started at %s", self.url)
 
     def stop(self) -> None:
         """Stop the fake InfluxDB server."""
-        self._log("Stopping server...")
+        log.info("Stopping server...")
         if self._server is not None:
             self._server.shutdown()
             self._server.server_close()
             self._server = None
             self._thread = None
-            self._log("Server stopped.")
+            log.info("Server stopped.")
         else:
-            self._log("Server is not running.")
+            log.warning("Server is not running.")
 
     # for use with "with FakeInfluxServer() as s:"
     def __enter__(self):

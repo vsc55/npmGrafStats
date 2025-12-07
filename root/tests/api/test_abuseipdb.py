@@ -5,20 +5,16 @@
 # pylint: disable=unused-argument
 
 import json
+
 import pytest
 import requests
 
-from api.external.abuseipdb import (
-    AbuseIPDB,
-    AbuseIPDBStatusReturn,
-)
-from api.external.abuseipdb.exceptions import (
-    AbuseIPDBConfigError,
-    AbuseIPDBNetworkError,
-    AbuseIPDBResponseError,
-    AbuseIPDBRateLimitError,
-)
-
+from api.external.abuseipdb import AbuseIPDB, AbuseIPDBStatusReturn
+from api.external.abuseipdb.exceptions import (AbuseIPDBConfigError,
+                                               AbuseIPDBNetworkError,
+                                               AbuseIPDBRateLimitError,
+                                               AbuseIPDBResponseError)
+from logger import LogLevel, get_manager
 
 # ---------------------------------------------------------------------------
 # Helpers / Dummy responses
@@ -31,6 +27,7 @@ class DummyResponse:
         self._payload = payload
 
     def json(self):
+        """ Return the preset JSON payload. """
         return self._payload
 
 
@@ -40,6 +37,7 @@ class DummyBadJSONResponse:
         self.status_code = status_code
 
     def json(self):
+        """ Always raises JSONDecodeError. """
         raise json.JSONDecodeError("Expecting value", "xxx", 0)
 
 
@@ -55,8 +53,6 @@ def test_defaults_and_base_result():
     assert abuse.url == "https://api.abuseipdb.com/api/v2/check"
     assert abuse.ip == ""
     assert abuse.key == ""
-    assert abuse.debug is False
-    assert abuse.show is True
     assert abuse.timeout == 10
     assert abuse.max_age_in_days == 90
     assert abuse.verbose is False
@@ -134,13 +130,9 @@ def test_verbose_and_timeout_and_flags():
     abuse = AbuseIPDB()
     abuse.verbose = True
     abuse.timeout = 5
-    abuse.debug = True
-    abuse.show = False
 
     assert abuse.verbose is True
     assert abuse.timeout == 5
-    assert abuse.debug is True
-    assert abuse.show is False
 
 
 # ---------------------------------------------------------------------------
@@ -152,7 +144,6 @@ def test_api_check_success(monkeypatch):
     abuse = AbuseIPDB()
     abuse.key = "KEY123"
     abuse.ip = "8.8.8.8"
-    abuse.show = False  # no output during test
 
     def fake_request(method, url, headers, params, timeout):
         assert method == "GET"
@@ -178,12 +169,11 @@ def test_api_check_success(monkeypatch):
     assert abuse.last_result == result
 
 
-def test_api_check_warning_no_data(monkeypatch, capsys):
+def test_api_check_warning_no_data(monkeypatch):
     """api_check -> WARNING when status_code=200 but no data."""
     abuse = AbuseIPDB()
     abuse.key = "KEY123"
     abuse.ip = "8.8.8.8"
-    abuse.show = True
 
     def fake_request(*args, **kwargs):
         return DummyResponse(200, {"data": {}, "errors": []})
@@ -199,9 +189,6 @@ def test_api_check_warning_no_data(monkeypatch, capsys):
     assert result["status_code"] == 200
     assert result["data"] == {}
     assert result["error_message"] == "No data returned from AbuseIPDB"
-
-    out = capsys.readouterr().out
-    assert "AbuseIPDB returned no data for 8.8.8.8" in out
 
 
 def test_api_check_config_error_no_key():
@@ -231,7 +218,6 @@ def test_api_check_network_error(monkeypatch):
     abuse = AbuseIPDB()
     abuse.key = "KEY123"
     abuse.ip = "8.8.8.8"
-    abuse.show = False
 
     def fake_request(*args, **kwargs):
         raise requests.RequestException("Boom")
@@ -249,12 +235,11 @@ def test_api_check_network_error(monkeypatch):
     assert isinstance(err.original, requests.RequestException)
 
 
-def test_api_check_json_decode_error(monkeypatch, capsys):
+def test_api_check_json_decode_error(monkeypatch):
     """JSON invalid -> AbuseIPDBResponseError."""
     abuse = AbuseIPDB()
     abuse.key = "KEY123"
     abuse.ip = "8.8.8.8"
-    abuse.show = True
 
     def fake_request(*args, **kwargs):
         return DummyBadJSONResponse(status_code=200)
@@ -267,20 +252,16 @@ def test_api_check_json_decode_error(monkeypatch, capsys):
     with pytest.raises(AbuseIPDBResponseError) as excinfo:
         abuse.api_check()
 
-    err = excinfo.value
+    err: AbuseIPDBResponseError = excinfo.value
     assert "Invalid JSON response from AbuseIPDB" in str(err)
     assert err.status_code == 200
 
-    out = capsys.readouterr().out
-    assert "JSON decode error" in out
 
-
-def test_api_check_http_error_raises_response_error(monkeypatch, capsys):
+def test_api_check_http_error_raises_response_error(monkeypatch):
     """HTTP != 200 -> AbuseIPDBResponseError with api_errors and status_code."""
     abuse = AbuseIPDB()
     abuse.key = "KEY123"
     abuse.ip = "8.8.8.8"
-    abuse.show = True
 
     err_code = 420
     err_detail = "Error detail message"
@@ -299,13 +280,9 @@ def test_api_check_http_error_raises_response_error(monkeypatch, capsys):
     with pytest.raises(AbuseIPDBResponseError) as excinfo:
         abuse.api_check()
 
-    err = excinfo.value
+    err: AbuseIPDBResponseError = excinfo.value
     assert err.status_code == err_code
     assert err.api_errors[0]["detail"] == err_detail
-
-    out = capsys.readouterr().out
-    assert f"AbuseIPDB request for {abuse.ip}: {err_code}" in out
-    assert err_detail in out
 
 
 def test_api_check_http_error_ratelimit(monkeypatch, capsys):
@@ -315,7 +292,6 @@ def test_api_check_http_error_ratelimit(monkeypatch, capsys):
     abuse = AbuseIPDB()
     abuse.key = "KEY123"
     abuse.ip = "8.8.8.8"
-    abuse.show = True
 
     err_code = 429
     err_detail = "Daily rate limit of 3000 requests exceeded for this endpoint. See headers for additional details."
@@ -334,38 +310,9 @@ def test_api_check_http_error_ratelimit(monkeypatch, capsys):
     with pytest.raises(AbuseIPDBRateLimitError) as excinfo:
         abuse.api_check()
 
-    err = excinfo.value
+    err: AbuseIPDBRateLimitError = excinfo.value
     assert err.status_code == err_code
     assert err.api_errors[0]["detail"] == err_detail
-
-
-def test_api_check_debug_prints_serializable_json(monkeypatch, capsys):
-    """With debug=True, prints serializable JSON (status as string)."""
-    abuse = AbuseIPDB()
-    abuse.key = "KEY123"
-    abuse.ip = "8.8.8.8"
-    abuse.debug = True
-    abuse.show = False
-
-    def fake_request(*args, **kwargs):
-        return DummyResponse(
-            200,
-            {"data": {"abuseConfidenceScore": 10}, "errors": []},
-        )
-
-    monkeypatch.setattr(
-        "api.external.abuseipdb.requests.request",
-        fake_request,
-    )
-
-    result = abuse.api_check()
-    assert result["status"] is AbuseIPDBStatusReturn.SUCCESS
-
-    out = capsys.readouterr().out
-    # There must be a line that is JSON:
-    debug_json = json.loads(out)  # throws if it's not valid json
-    assert debug_json["status"] == "SUCCESS"
-    assert debug_json["data"]["abuseConfidenceScore"] == 10
 
 
 # ---------------------------------------------------------------------------
@@ -400,7 +347,7 @@ def test_check_network_error_maps_to_minus2(monkeypatch):
         fake_request,
     )
 
-    result = AbuseIPDB.check("8.8.8.8", "KEY123", show=False)
+    result = AbuseIPDB.check("8.8.8.8", "KEY123")
 
     assert result["status"] is AbuseIPDBStatusReturn.ERROR
     assert result["status_code"] == -2
@@ -424,7 +371,7 @@ def test_check_response_error_maps_http_status(monkeypatch):
         fake_request,
     )
 
-    result = AbuseIPDB.check("8.8.8.8", "BADKEY", show=False)
+    result = AbuseIPDB.check("8.8.8.8", "BADKEY")
 
     assert result["status"] is AbuseIPDBStatusReturn.ERROR
     assert result["status_code"] == 401
@@ -445,7 +392,7 @@ def test_check_success_path(monkeypatch):
         fake_request,
     )
 
-    result = AbuseIPDB.check("8.8.8.8", "KEY123", show=False)
+    result = AbuseIPDB.check("8.8.8.8", "KEY123")
 
     assert result["status"] is AbuseIPDBStatusReturn.SUCCESS
     assert result["status_code"] == 200
@@ -473,7 +420,7 @@ def test_checks_multiple_ips(monkeypatch):
     )
 
     ips = ["8.8.8.8", "1.1.1.1"]
-    results = AbuseIPDB.checks(ips, "KEY123", show=False)
+    results = AbuseIPDB.checks(ips, "KEY123")
 
     assert calls == ips
     assert len(results) == 2
@@ -496,7 +443,7 @@ def test_checks_mixed_valid_and_invalid_ip(monkeypatch):
     )
 
     ips = ["8.8.8.8", "not-an-ip", "1.1.1.1"]
-    results = AbuseIPDB.checks(ips, "KEY123", show=False)
+    results = AbuseIPDB.checks(ips, "KEY123")
 
     assert len(results) == 3
 

@@ -3,16 +3,12 @@
 from __future__ import annotations
 
 import os
+
 import pytest
 
-from api.external.abuseipdb import (
-    AbuseIPDB,
-    AbuseIPDBStatusReturn,
-)
-from api.external.abuseipdb.exceptions import (
-    AbuseIPDBRateLimitError,
-    AbuseIPDBResponseError,
-)
+from api.external.abuseipdb import AbuseIPDB, AbuseIPDBStatusReturn
+from api.external.abuseipdb.exceptions import (AbuseIPDBRateLimitError,
+                                               AbuseIPDBResponseError)
 
 ABUSEIP_KEY = os.getenv("TEST_ABUSEIP_KEY", "")
 
@@ -27,7 +23,6 @@ def test_abuseipdb_connection_and_check_integration():
     abuse = AbuseIPDB()
     abuse.key = ABUSEIP_KEY
     abuse.ip = "8.8.8.8"
-    abuse.show = False  # no output during test
 
     try:
         result = abuse.api_check()

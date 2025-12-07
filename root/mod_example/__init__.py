@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 from typing import Iterable, Literal
-from tasks import LogTask, LineProcessor, ListEnabled, DiscoveryInfo
-from connector.influx import InfluxRecord
+
 from config import GlobalConfig
+from connector.influx import InfluxRecord
+from logger import get_logger
+from tasks import DiscoveryInfo, LineProcessor, ListEnabled, LogTask
+
 from .config import ModExampleConfig
 from .handlers import handle_line
-
 
 __version__ = "1.0.0"
 __description__ = "Example integration package."
 
+log = get_logger(__name__)
 
 def make_processor(env: str, config: GlobalConfig) -> LineProcessor:
     """ Excample line processor with the given environment. """

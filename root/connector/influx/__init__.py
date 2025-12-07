@@ -2,19 +2,20 @@
 """ InfluxDB v2 client wrapper """
 from __future__ import annotations
 
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Optional
-import threading
 
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
 
-from .exceptions import (
-    InfluxClientConfigError,
-    InfluxClientInitError,
-    InfluxClientConnectionError
-)
+from logger import get_logger
+
+from .exceptions import (InfluxClientConfigError, InfluxClientConnectionError,
+                         InfluxClientInitError)
+
+log = get_logger(__name__)
 
 @dataclass(frozen=True)
 class InfluxRecord:
@@ -30,7 +31,6 @@ class InfluxClient:
     """
 
     def __init__(self) -> None:
-        self._debug: bool = False
         self._url: str = ""
         self._org: str = ""
         self._token: str = ""
@@ -74,19 +74,11 @@ class InfluxClient:
     def bucket(self, value: str) -> None:
         self._bucket = value.strip()
 
-    @property
-    def debug(self) -> bool:
-        """ Enable or disable debug mode. """
-        return self._debug
-    @debug.setter
-    def debug(self, value: bool) -> None:
-        self._debug = value
-
 
     # ---------- Factory ----------
     @staticmethod
     def create(
-        url: str, org: str, token: str, bucket: str, *, debug: bool = True
+        url: str, org: str, token: str, bucket: str
     ) -> "InfluxClient":
         """
         Factory method to build a configured client.
@@ -95,12 +87,10 @@ class InfluxClient:
             org: Organization name in InfluxDB.
             token: Authentication token for InfluxDB.
             bucket: Bucket name in InfluxDB.
-            debug: Enable debug mode (default: True).
         Returns:
             InfluxClient: Configured InfluxClient instance.
         """
         client = InfluxClient()
-        client.debug = debug
         client.url = url
         client.org = org
         client.token = token
@@ -109,12 +99,6 @@ class InfluxClient:
 
 
     # ---------- Internals ----------
-    def _log(self, msg: str) -> None:
-        """ Log a debug message if debug mode is enabled. """
-        if self.debug:
-            print(f"[InfluxClient] {msg}", flush=True)
-
-
     def _ensure_client(self) -> None:
         """Lazy, thread-safe creation of the underlying client + write_api."""
         if self._client is not None and self._write_api is not None:
@@ -127,7 +111,7 @@ class InfluxClient:
             if not (self.url and self.org and self.token):
                 raise InfluxClientConfigError("Missing url/org/token configuration.")
 
-            self._log(f"Creating client url={self.url} org={self.org} bucket={self.bucket}")
+            log.info("Creating client url=%s org=%s bucket=%s", self.url, self.org, self.bucket)
             self._client = influxdb_client.InfluxDBClient(
                 url=self.url,
                 token=self.token,
@@ -186,14 +170,11 @@ class InfluxClient:
 
         try:
             ok = bool(self._client.ping())
-            if not ok:
-                self._log("Ping to InfluxDB returned False.")
-            else:
-                self._log("Ping to InfluxDB OK.")
+            log.info("Ping to InfluxDB %s.", "succeeded" if ok else "failed")
             return ok
 
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            self._log(f"Ping to InfluxDB failed: {e}")
+        except Exception:  # pylint: disable=broad-exception-caught
+            log.exception("Ping to InfluxDB Exception!")
             return False
 
     # ---------- Public API ----------
@@ -218,7 +199,7 @@ class InfluxClient:
         tags = dict(rec.tags or {})
         fields = dict(rec.fields or {})
         if not rec.measurement or not fields:
-            self._log("Empty measurement or fields; skipping write.")
+            log.warning("Empty measurement or fields; skipping write.")
             return
 
         point = influxdb_client.Point(rec.measurement)
@@ -231,9 +212,8 @@ class InfluxClient:
         if rec.timestamp:
             point.time(rec.timestamp)
 
-        self._log(
-            f"write -> measurement={rec.measurement} "
-            f"tags={tags} fields={fields} ts={rec.timestamp or 'now'}"
+        log.debug("write -> measurement=%s tags=%s fields=%s ts=%s",
+            rec.measurement, tags, fields, rec.timestamp or 'now'
         )
 
         try:
@@ -252,7 +232,11 @@ class InfluxClient:
         """Close the underlying client."""
         with self._lock:
             if self._client is not None:
-                self._log("Closing client.")
+                log.info("Closing client...")
                 self._client.close()
+                log.info("Client closed OK")
+            else:
+                log.warning("Client was not initialized.")
+
             self._client = None
             self._write_api = None

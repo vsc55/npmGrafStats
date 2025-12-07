@@ -4,19 +4,21 @@ GeoIP2 local database integration.
 """
 
 from __future__ import annotations
+
 import ipaddress
+import os
 from dataclasses import dataclass, field
 from typing import TypedDict
-import os
 
 import geoip2.database
 import geoip2.errors
 import maxminddb
 
-from .exceptions import (
-    GeoIP2ConfigError,
-    GeoIP2PathDBError
-)
+from logger import get_logger
+
+from .exceptions import GeoIP2ConfigError, GeoIP2PathDBError
+
+log = get_logger(__name__)
 
 
 class GeoIP2CityResult(TypedDict, total=False):
@@ -118,35 +120,6 @@ class GeoIP2Client:
         """Check if IP address is set."""
         return self.ip != ""
 
-
-    # ----- Debug -----
-    _debug: bool = field(default=False)
-    @property
-    def debug(self) -> bool:
-        """Get the debug flag"""
-        return self._debug
-
-    @debug.setter
-    def debug(self, value: bool) -> None:
-        """Set the debug flag"""
-        self._debug = value
-
-    def _debug_print(self, msg: str) -> None:
-        if self.debug:
-            print(msg, flush=True)
-
-
-    # ----- Show -----
-    _show: bool = field(default=True)
-    @property
-    def show(self) -> bool:
-        """Get the show flag"""
-        return self._show
-
-    @show.setter
-    def show(self, value: bool) -> None:
-        """Set the show flag"""
-        self._show = value
 
     # ---- Base Structures ----
     def _base_city(self, status: str = "fail") -> GeoIP2CityResult:
@@ -250,7 +223,7 @@ class GeoIP2Client:
             if reader_db is not None:
                 reader_db.close()
 
-        self._debug_print(f"[GeoIP2] City result: {geo_info}")
+        log.debug("[GeoIP2] City result: %s", geo_info)
         return geo_info
 
 
@@ -270,7 +243,8 @@ class GeoIP2Client:
             if data_asn is None:
                 asn_info["status"] = "no_data"
                 asn_info["error_message"] = "Missing ASN data"
-                self._debug_print(f"[GeoIP2] No ASN data for IP {self.ip} in ASN database")
+
+                log.warning("[GeoIP2] No ASN data for IP %s in ASN database", self.ip)
             else:
                 asn_info["asn"] = str(data_asn.autonomous_system_number) or ""
                 asn_info["org"] = data_asn.autonomous_system_organization or ""
@@ -288,32 +262,24 @@ class GeoIP2Client:
             if reader_db is not None:
                 reader_db.close()
 
-        self._debug_print(f"[GeoIP2] ASN result: {asn_info}")
+        log.debug("[GeoIP2] ASN result: %s", asn_info)
         return asn_info
 
     @staticmethod
-    def get_city(
-        ip: str, db: str, *, debug: bool = False, show: bool = True
-    ) -> GeoIP2CityResult:
+    def get_city(ip: str, db: str) -> GeoIP2CityResult:
         """  Get GeoIP2 City information for a given IP address. """
         client = GeoIP2Client()
         client.ip = ip
         client.city_db_path = db
-        client.debug = debug
-        client.show = show
         return client.city()
 
 
     @staticmethod
-    def get_citys(
-        ips: list[str], db: str, *, debug: bool = False, show: bool = True
-    ) -> dict[str, GeoIP2CityResult]:
+    def get_citys(ips: list[str], db: str) -> dict[str, GeoIP2CityResult]:
         """ Get GeoIP2 City information for a list of IP addresses. """
         results: dict[str, GeoIP2CityResult] = {}
         client = GeoIP2Client()
         client.city_db_path = db
-        client.debug = debug
-        client.show = show
 
         for ip in ips:
             client.ip = ip
@@ -324,27 +290,19 @@ class GeoIP2Client:
 
 
     @staticmethod
-    def get_asn(
-        ip: str, db: str, *, debug: bool = False, show: bool = True
-    ) -> GeoIP2ASNResult:
+    def get_asn(ip: str, db: str) -> GeoIP2ASNResult:
         """ Get ASN information for a given IP address. """
         client = GeoIP2Client()
         client.ip = ip
         client.asn_db_path = db
-        client.debug = debug
-        client.show = show
         return client.asn()
 
     @staticmethod
-    def get_asns(
-        ips: list[str], db: str, *, debug: bool = False, show: bool = True
-    ) -> dict[str, GeoIP2ASNResult]:
+    def get_asns(ips: list[str], db: str) -> dict[str, GeoIP2ASNResult]:
         """ Get ASN information for a list of IP addresses. """
         results: dict[str, GeoIP2ASNResult] = {}
         client = GeoIP2Client()
         client.asn_db_path = db
-        client.debug = debug
-        client.show = show
 
         for ip in ips:
             client.ip = ip

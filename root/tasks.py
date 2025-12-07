@@ -2,13 +2,17 @@
 """ Manages log tasks from various providers. """
 from __future__ import annotations
 
-import pkgutil
 import importlib
-from pathlib import Path
+import pkgutil
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable, TypedDict
+
 from config import GlobalConfig
 from connector.influx import InfluxRecord
+from logger import get_logger
+
+log = get_logger(__name__)
 
 LogTasksProviderRef = tuple[str, str, str]  # (package, module, function_name)
 
@@ -87,7 +91,11 @@ class TasksConfig:
 
             info_mod = func_discovery()
             if not info_mod.get("status", True):
-                print(f"Skipping module {full_name} in package {package}: disabled from discovery.")
+                log.warning(
+                    "Skipping module %s in package %s: disabled from discovery.",
+                    full_name,
+                    package
+                )
                 continue  # Module disabled from discovery.
 
             # Actions to be taken by discovery.
@@ -112,7 +120,12 @@ class TasksConfig:
 
             for a in actions:
                 if not info_mod.get(a["state"], True):
-                    print(f"Skipping {a['state']} for module {full_name} in package {package}")
+                    log.warning(
+                        "Skipping %s for module %s in package %s",
+                        a["state"],
+                        full_name,
+                        package
+                    )
                     continue
 
                 func_name = info_mod.get(a["func_key"], a["default"])

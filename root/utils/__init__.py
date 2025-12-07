@@ -10,14 +10,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
+from logger import get_logger
+
+log = get_logger(__name__)
+
 TRUTHY = ("1", "true", "yes", "on")
-
-def debug_msg(message: str):
-    """ Print debug message if debug mode is enabled. """
-    from config import cfg  # pylint: disable=import-outside-toplevel
-    if cfg.debug:
-        print(message, flush=True)
-
 
 def format_time(oldtime: str) -> str | None:
     """
@@ -38,7 +35,7 @@ def format_time(oldtime: str) -> str | None:
     """
 
     if oldtime is None or len(oldtime) < 26:
-        debug_msg(f"Invalid time format: '{oldtime}'")
+        log.debug("Invalid time format: '%s'", oldtime)
         return None
 
     month_map = {
@@ -54,7 +51,7 @@ def format_time(oldtime: str) -> str | None:
     tz_min = oldtime[24:26].strip()
 
     newtime = f"{year}-{month}-{day}T{datetime_part}{tz_hour}:{tz_min}"
-    debug_msg(f"Transformed time from '{oldtime}' to '{newtime}'")
+    log.debug("Transformed time from '%s' to '%s'", oldtime, newtime)
 
     return newtime
 
@@ -92,7 +89,7 @@ def is_ip_in_range(ip: str, list_entries: list[str]) -> bool:
     try:
         addr = ipaddress.ip_address(ip)
     except ValueError:
-        debug_msg(f"[is_ip_in_range] Invalid IP address: {ip}")
+        log.debug("[is_ip_in_range] Invalid IP address: %s", ip)
         return False
 
     for entry in list_entries:
@@ -109,7 +106,7 @@ def is_ip_in_range(ip: str, list_entries: list[str]) -> bool:
                 if start_ip <= addr <= end_ip:
                     return True
             except ValueError:
-                debug_msg(f"[is_ip_in_range] Invalid range entry: {entry}")
+                log.debug("[is_ip_in_range] Invalid range entry: %s", entry)
                 continue
 
         # Case 2: CIDR or single IP
@@ -119,7 +116,7 @@ def is_ip_in_range(ip: str, list_entries: list[str]) -> bool:
                 if addr in network:
                     return True
             except ValueError:
-                debug_msg(f"[is_ip_in_range] Invalid network entry: {entry}")
+                log.debug("[is_ip_in_range] Invalid network entry: %s", entry)
                 continue
 
     return False

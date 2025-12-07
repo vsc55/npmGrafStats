@@ -2,15 +2,19 @@
 """ Configuration specific to Nginx Proxy Manager. """
 from __future__ import annotations
 
-import os
 import glob
-from pathlib import Path
+import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 from enum import Enum
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from logger import get_logger
 
 if TYPE_CHECKING:
     from config import GlobalConfig
+
+log = get_logger(__name__)
 
 class LogsPaths(str, Enum):
     """ Enumeration for log file types. """

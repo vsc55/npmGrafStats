@@ -13,10 +13,12 @@ from api.external.geoip2 import GeoIP2Client
 from api.external.geoip2.exceptions import GeoIP2ConfigError, GeoIP2PathDBError
 from config import GlobalConfig
 from connector.influx import InfluxRecord
-from utils import (Regex, TypeRegex, debug_msg, format_time, is_ip_in_range,
-                   parse_float)
+from logger import get_logger
+from utils import Regex, TypeRegex, format_time, is_ip_in_range, parse_float
 
 from .types import LogKind, TypeSendRecord
+
+log = get_logger(__name__)
 
 
 @dataclass
@@ -41,17 +43,10 @@ class HandlersNPM:
         self.line = line
         self.mode = mode
 
-    @property
-    def debug(self) -> bool:
-        """ Returns the debug setting from the configuration. """
-        return self.config.debug
-
-
     def search_in_line(self, line: Optional[str] = None) -> dict[str, str]:
         """ Returns basic info about the handler. """
         if line is None:
             line = self.line
-
 
         log_regex = re.compile(
             r'^\[(?P<time_local>[^\]]+)\]\s+'
@@ -73,7 +68,7 @@ class HandlersNPM:
         m = log_regex.match(line)
         if m:
             data = m.groupdict()
-            # print(data)
+            log.debug("Parsed log data: %s", data)
 
         method = data.get("method", "")
         scheme = data.get("scheme", "")
@@ -192,11 +187,11 @@ class HandlersNPM:
                 list_ips = [line.strip() for line in f if line.strip() and not line.startswith("#")]
 
         except ValueError:
-            debug_msg(f"[Error] Invalid IP address: {ip}")
+            log.error("Invalid IP address: %s", ip)
             return False
 
         except FileNotFoundError:
-            debug_msg(f"[Error] Monitoring file not found: {path}")
+            log.error("Monitoring file not found: %s", path)
             return False
 
         return is_ip_in_range(ip, list_ips)
@@ -206,7 +201,7 @@ class HandlersNPM:
 
         try:
             db = self.config.geo_city_db_path
-            geo_data = GeoIP2Client.get_city(ip, db, debug = self.debug, show=True)
+            geo_data = GeoIP2Client.get_city(ip, db)
             geo_return: dict[str, str | float] = {
                 "key": geo_data["iso_code"],
                 "City": geo_data["city"],
@@ -216,8 +211,8 @@ class HandlersNPM:
                 "longitude": parse_float(geo_data["longitude"], 0.0),
             }
 
-        except (GeoIP2PathDBError, GeoIP2ConfigError) as e:
-            print(f"[Warn] GeoIP2 City lookup failed for IP {ip}: {e}", file=sys.stderr, flush=True)
+        except (GeoIP2PathDBError, GeoIP2ConfigError):
+            log.warning("GeoIP2 City lookup failed for IP '%s'", ip)
             geo_return = {}
             # geo_return : dict[str, str | float] = {
             #     "key": "",
@@ -237,10 +232,10 @@ class HandlersNPM:
 
         try:
             db = self.config.geo_asn_db_path
-            data = GeoIP2Client.get_asn(ip, db, debug = self.debug, show=True)
+            data = GeoIP2Client.get_asn(ip, db)
 
-        except (GeoIP2PathDBError, GeoIP2ConfigError) as e:
-            print(f"[Warn] GeoIP2 ASN lookup failed for IP {ip}: {e}", file=sys.stderr, flush=True)
+        except (GeoIP2PathDBError, GeoIP2ConfigError):
+            log.warning("GeoIP2 ASN lookup failed for IP '%s'", ip)
             return {
                 "asn": 0,
                 "org": "Unknown",
@@ -251,7 +246,7 @@ class HandlersNPM:
     def _get_abuseipdb(self, ip: str) -> dict[str, int]:
         """ Returns AbuseIPDB data for the given IP. """
         abuse_key = self.config.api_abuseip_key
-        abuse_result = AbuseIPDB.check(ip, key=abuse_key, debug=self.debug, show=True)
+        abuse_result = AbuseIPDB.check(ip, key=abuse_key)
         if abuse_result["status"] is AbuseIPDBStatusReturn.SUCCESS:
             abuse_confidence_score = abuse_result["data"].get("abuseConfidenceScore", 0)
             abuse_total_reports = abuse_result["data"].get("totalReports", 0)
@@ -341,14 +336,17 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
     length = result_line["length"]
     measurement_time = result_line["measurement_time"]
 
-    debug_msg(
-        f"[DEBUG] Parsed line - outside_ip: {outside_ip}, "
-        f"target_ip: {target_ip}, domain: {domain}, "
-        f"length: {length}, measurement_time: {measurement_time}"
+    log.debug(
+        "Parsed line - outside_ip: %s, target_ip: %s, domain: %s, length: %d, measurement_time: %s",
+        outside_ip,
+        target_ip,
+        domain,
+        length,
+        measurement_time,
     )
 
     if not outside_ip:
-        debug_msg(f"[{mode}] No outside IP found in line")
+        log.warning("[%s] No outside IP found in line", mode)
         return records
 
     measurement: str | None = None
@@ -365,10 +363,10 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
         # pero NUNCA pasa a Monitoring o ReverseProxy/Redirections.
 
         if config.internal_logs is False:
-            debug_msg(f"[{mode}] Internal IP-Source: {outside_ip} called: {domain}, skipping")
+            log.info("[%s] Internal IP-Source: %s called: %s, skipping", mode, outside_ip, domain)
             return records
 
-        debug_msg(f"[{mode}] Internal IP-Source: {outside_ip} called: {domain}")
+        log.info("[%s] Internal IP-Source: %s called: %s", mode, outside_ip, domain)
         measurement = "InternalRProxyIPs"
         send_type = TypeSendRecord.LOCAL
         rec_asn = False
@@ -379,10 +377,10 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
         # and NEVER falls to the else of normal connections.
 
         if config.monitoring_logs is False:
-            debug_msg(f"[{mode}] Monitoring IP-Source: {outside_ip} called: {domain}, skipping")
+            log.info("[%s] Monitoring IP-Source: %s called: %s, skipping", mode, outside_ip, domain)
             return records
 
-        debug_msg(f"[{mode}] An excluded monitoring service checked: {domain}")
+        log.info("[%s] An excluded monitoring service checked: %s", mode, domain)
         measurement = "MonitoringRProxyIPs"
         send_type = TypeSendRecord.PUBLIC
 
@@ -390,7 +388,7 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
     else:
          # Only process public IPs if PUBLIC_LOGS=TRUE
         if config.public_logs is False:
-            debug_msg(f"[{mode}] Skipping public IP (PUBLIC_LOGS disabled): {outside_ip}")
+            log.info("[%s] Skipping public IP (PUBLIC_LOGS disabled): %s", mode, outside_ip)
             return records
 
         if mode == "proxy":
@@ -404,10 +402,10 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
             rec_target = "redirect"
 
         else:
-            print(f"[{mode}] Unknown mode, skipping line", file=sys.stderr, flush=True)
+            log.warning("[%s] Unknown mode, skipping line", mode)
             return records
 
-        debug_msg(f"[{mode}] Normal connection: {outside_ip} -> {domain}")
+        log.info("[%s] Normal connection: %s -> %s", mode, outside_ip, domain)
         send_type = TypeSendRecord.PUBLIC
 
     # if measurement and send_type are set, create the InfluxRecord

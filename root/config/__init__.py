@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """ Global configuration for the application. """
 from __future__ import annotations
+
 import os
 from dataclasses import dataclass, field
-from typing import Optional, TYPE_CHECKING
 from pathlib import Path
-from utils.external_ip import ExternalIP
+from typing import TYPE_CHECKING, Optional
+
+from logger import get_logger
 from utils import env_bool, env_int
+from utils.external_ip import ExternalIP
 
 if TYPE_CHECKING:
     from npm.config import NpmConfig
+
+log = get_logger(__name__)
 
 @dataclass(frozen=False)
 class GlobalConfig:
@@ -22,11 +27,8 @@ class GlobalConfig:
 
     # ------- Post-initialization --------
     def __post_init__(self):
-        pass
+        log.debug("GlobalConfig initialized")
 
-
-    # -------- General settings --------
-    debug: bool = False
 
     # -------- Application version --------
     @property
@@ -142,9 +144,8 @@ class GlobalConfig:
         try:
             return self._external_ip.get_ip() or ""
 
-        except Exception as e: # pylint: disable=broad-except
-            if self.debug:
-                print(f"Error fetching external IP: {e}", flush=True)
+        except Exception: # pylint: disable=broad-except
+            log.exception("Error fetching external IP")
 
         return ""
 
@@ -165,12 +166,12 @@ class GlobalConfig:
 
 
     @classmethod
-    def build(cls) -> "GlobalConfig":
+    def build(cls) -> GlobalConfig:
         """
         Create the global config and load module sub-configs (npm, etc).
         """
+        log.debug("Building GlobalConfig...")
         newcfg = cls()
-        newcfg.debug = env_bool("DEBUG", False)
 
         newcfg.proxy_logs = env_bool("PROXY_LOGS", True)
         newcfg.redirect_logs = env_bool("REDIRECT_LOGS", True)
@@ -196,7 +197,37 @@ class GlobalConfig:
         newcfg.geo_asn_db_path = os.getenv('GEO_ASN_DB_PATH', "/geolite/GeoLite2-ASN.mmdb")
         newcfg.geo_city_db_path = os.getenv('GEO_CITY_DB_PATH', "/geolite/GeoLite2-City.mmdb")
 
+        log.debug(
+            "Config:\n"
+            " - proxy_logs=%s\n"
+            " - redirect_logs=%s\n"
+            " - public_logs=%s\n"
+            " - internal_logs=%s\n"
+            " - monitoring_logs=%s\n"
+            " - geo_asn_db_path=%s (exists=%s)\n"
+            " - geo_city_db_path=%s (exists=%s)\n"
+            " - monitor_file_path=%s (exists=%s)\n"
+            " - influxdb=%s\n"
+            " - influxdb_retry_connect=%s\n"
+            " - influxdb_retry_delay=%s\n\n",
+            newcfg.proxy_logs,
+            newcfg.redirect_logs,
+            newcfg.public_logs,
+            newcfg.internal_logs,
+            newcfg.monitoring_logs,
+            newcfg.geo_asn_db_path,
+            newcfg.geo_asn_db_exists,
+            newcfg.geo_city_db_path,
+            newcfg.geo_city_db_exists,
+            newcfg.monitor_file_path,
+            newcfg.monitor_file_exists,
+            "newcfg.influxdb",
+            newcfg.influxdb_retry_connect,
+            newcfg.influxdb_retry_delay
+        )
+
         newcfg.lock()
+        log.debug("GlobalConfig built successfully.")
         return newcfg
 
 cfg = GlobalConfig.build()

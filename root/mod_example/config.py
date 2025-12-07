@@ -5,8 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from logger import get_logger
+
 if TYPE_CHECKING:
     from config import GlobalConfig
+
+log = get_logger(__name__)
 
 @dataclass
 class ModExampleConfig:

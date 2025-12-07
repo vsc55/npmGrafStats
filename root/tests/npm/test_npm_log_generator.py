@@ -2,6 +2,7 @@
 """Tests para npm.simulator.log_generator.NginxLogGenerator."""
 import time
 from pathlib import Path
+
 import pytest
 
 from npm.simulator.log_generator import NginxLogGenerator
@@ -83,7 +84,6 @@ def test_write_line_creates_file(tmp_path: Path):
 
     logfile = tmp_path / "out.log"
     gen = NginxLogGenerator(output=str(logfile))
-    gen.debug = False
 
     gen._write_line("test-line-1\n")
     gen._write_line("test-line-2\n")

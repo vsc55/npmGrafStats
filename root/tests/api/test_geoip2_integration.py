@@ -5,11 +5,14 @@
 # pylint: disable=redefined-outer-name
 
 from __future__ import annotations
+
 from pathlib import Path
+
 import pytest
+
 from api.external.geoip2 import GeoIP2Client
 
-DEBUG = False  # Set true dumping results to stdout
+DEBUG_TEST = False  # Set true dumping results to stdout
 
 @pytest.fixture(scope="session")
 def geoip2_paths_fixture() -> dict[str, Path]:
@@ -35,7 +38,7 @@ def test_city_with_real_db(geoip2_paths_fixture):
 
     result = client.city()
 
-    if DEBUG:
+    if DEBUG_TEST:
         from pprint import pprint
         pprint(result)
         # {
@@ -68,7 +71,7 @@ def test_asn_with_real_db(geoip2_paths_fixture):
 
     result = client.asn()
 
-    if DEBUG:
+    if DEBUG_TEST:
         from pprint import pprint
         pprint(result)
         # {

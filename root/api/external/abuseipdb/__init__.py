@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 """ Utility functions for AbuseIPDB integration. """
 from __future__ import annotations
-import json
+
 import ipaddress
+import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TypedDict, Any
+from typing import Any, TypedDict
+
 import requests
-from .exceptions import (
-    AbuseIPDBConfigError,
-    AbuseIPDBNetworkError,
-    AbuseIPDBResponseError,
-    AbuseIPDBRateLimitError
-)
+
+from logger import LogLevel, get_logger
+
+from .exceptions import (AbuseIPDBConfigError, AbuseIPDBNetworkError,
+                         AbuseIPDBRateLimitError, AbuseIPDBResponseError)
+
+log = get_logger(__name__)
 
 class AbuseIPDBResult(TypedDict, total=False):
     """ Structured result for AbuseIPDB checks. """
@@ -137,32 +140,6 @@ class AbuseIPDB:
         return self._key.strip() != ""
 
 
-    # ----- Debug -----
-    _debug: bool = field(default=False)
-    @property
-    def debug(self) -> bool:
-        """Get the debug flag"""
-        return self._debug
-
-    @debug.setter
-    def debug(self, value: bool) -> None:
-        """Set the debug flag"""
-        self._debug = value
-
-
-    # ----- Show -----
-    _show: bool = field(default=True)
-    @property
-    def show(self) -> bool:
-        """Get the show flag"""
-        return self._show
-
-    @show.setter
-    def show(self, value: bool) -> None:
-        """Set the show flag"""
-        self._show = value
-
-
     # ----- Timeout -----
     _timeout: int = field(default=10)
     @property
@@ -274,11 +251,7 @@ class AbuseIPDB:
             )
 
         except requests.RequestException as re:
-            if self.show:
-                print(
-                    f"[Error] AbuseIPDB request exception for {self.ip}: {re}",
-                    flush=True
-                )
+            log.exception("AbuseIPDB request exception for %s", self.ip)
             raise AbuseIPDBNetworkError("Network error calling AbuseIPDB", original=re) from re
 
         response_json: dict[str, Any] = {}
@@ -286,11 +259,7 @@ class AbuseIPDB:
             response_json = response.json()
 
         except json.JSONDecodeError as je:
-            if self.show:
-                print(
-                    f"[Error] AbuseIPDB JSON decode error for {self.ip}: {je}",
-                    flush=True
-                )
+            log.exception("AbuseIPDB JSON decode error for %s", self.ip)
             raise AbuseIPDBResponseError(
                 "Invalid JSON response from AbuseIPDB",
                 status_code=response.status_code,
@@ -317,14 +286,10 @@ class AbuseIPDB:
                 )
 
             case _:
-                if self.show:
-                    print(
-                        f"[Error] AbuseIPDB request for {self.ip}: {response.status_code}",
-                        flush=True
-                    )
-                    for err in errors:
-                        detail = err.get("detail", "No detail provided")
-                        print(f"  [AbuseIPDB Error] {detail}", flush=True)
+                log.error("AbuseIPDB request for %s: %s", self.ip, response.status_code)
+                for err in errors:
+                    detail = err.get("detail", "No detail provided")
+                    log.error("  [AbuseIPDB Error] %s", detail)
 
                 raise AbuseIPDBResponseError(
                     "AbuseIPDB request failed",
@@ -335,28 +300,32 @@ class AbuseIPDB:
         if not data:
             result["status"] = AbuseIPDBStatusReturn.WARNING
             result["error_message"] = "No data returned from AbuseIPDB"
-            if self.show:
-                print(f"[Warning] AbuseIPDB returned no data for {self.ip}", flush=True)
+            log.warning("AbuseIPDB returned no data for %s", self.ip)
 
-        if self.debug:
+        if log.isEnabledFor(LogLevel.DEBUG.value):
             debug_result = dict(result)
-            if isinstance(debug_result.get("status"), AbuseIPDBStatusReturn):
-                debug_result["status"] = debug_result["status"].name
-            print(json.dumps(debug_result, indent=4, sort_keys=True), flush=True)
+            status = debug_result.get("status")
+
+            if isinstance(status, AbuseIPDBStatusReturn):
+                debug_result["status"] = status.name
+
+            log.debug(
+                "AbuseIPDB result for %s: %s",
+                self.ip,
+                json.dumps(debug_result, indent=4, sort_keys=True)
+            )
 
         self._last_result = result
         return result
 
 
     @staticmethod
-    def check(ip: str, key: str, debug: bool = False, show: bool = True) -> AbuseIPDBResult:
+    def check(ip: str, key: str) -> AbuseIPDBResult:
         """
         Static method to check an IP address against AbuseIPDB.
         Args:
             ip (str): The IP address to check.
             key (str): The API key for AbuseIPDB.
-            debug (bool): Whether to print debug information.
-            show (bool): Whether to print errors to stdout.
         Returns:
             AbuseIPDBResult: Structured result with status, codes, data and errors.
 
@@ -368,8 +337,6 @@ class AbuseIPDB:
         """
         abuseipdb = AbuseIPDB()
         abuseipdb.key = key
-        abuseipdb.debug = debug
-        abuseipdb.show = show
 
         try:
             abuseipdb.ip = ip
@@ -402,16 +369,12 @@ class AbuseIPDB:
             return base
 
     @staticmethod
-    def checks(
-        ips: list[str], key: str, debug: bool = False, show: bool = True
-    ) -> list[AbuseIPDBResult]:
+    def checks(ips: list[str], key: str) -> list[AbuseIPDBResult]:
         """
         Static method to check multiple IP addresses against AbuseIPDB.
         Args:
             ips (list[str]): The list of IP addresses to check.
             key (str): The API key for AbuseIPDB.
-            debug (bool): Whether to print debug information.
-            show (bool): Whether to print errors to stdout.
         Returns:
             list[AbuseIPDBResult]: List of structured results for each IP.
 
@@ -423,6 +386,6 @@ class AbuseIPDB:
         """
         results: list[AbuseIPDBResult] = []
         for ip in ips:
-            result = AbuseIPDB.check(ip, key, debug, show)
+            result = AbuseIPDB.check(ip, key)
             results.append(result)
         return results

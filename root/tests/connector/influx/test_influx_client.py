@@ -7,7 +7,8 @@ import pytest
 
 import connector.influx as influx_module
 from connector.influx import InfluxClient, InfluxRecord
-from connector.influx.exceptions import InfluxClientConfigError, InfluxClientInitError
+from connector.influx.exceptions import (InfluxClientConfigError,
+                                         InfluxClientInitError)
 
 
 # -------------------- Dummies -------------------- #
@@ -90,15 +91,13 @@ def test_create_sets_properties():
         url="http://localhost:8086",
         org="my-org",
         token="my-token",
-        bucket="my-bucket",
-        debug=False,
+        bucket="my-bucket"
     )
 
     assert client.url == "http://localhost:8086"
     assert client.org == "my-org"
     assert client.token == "my-token"
     assert client.bucket == "my-bucket"
-    assert client.debug is False
 
 
 def test_ensure_client_missing_config_raises_config_error():
@@ -120,7 +119,6 @@ def test_ensure_client_creates_client_once(patched_influx):
         org="my-org",
         token="my-token",
         bucket="my-bucket",
-        debug=False,
     )
 
     # First call: creates the client
@@ -146,8 +144,7 @@ def test_client_context_yields_client(patched_influx):
         url="http://localhost:8086",
         org="my-org",
         token="my-token",
-        bucket="my-bucket",
-        debug=False, # disable debug to avoid extra prints
+        bucket="my-bucket"
     )
 
     with client.client() as c:
@@ -248,8 +245,7 @@ def test_write_point_empty_measurement_or_fields_skip_write(patched_influx):
         url="http://localhost:8086",
         org="my-org",
         token="my-token",
-        bucket="my-bucket",
-        debug=False, # disable debug to avoid extra prints
+        bucket="my-bucket"
     )
 
     client._ensure_client()
@@ -273,8 +269,7 @@ def test_write_point_happy_path_builds_point_and_calls_write(patched_influx):
         url="http://localhost:8086",
         org="my-org",
         token="my-token",
-        bucket="my-bucket",
-        debug=False, # disable debug to avoid extra prints
+        bucket="my-bucket"
     )
 
     client._ensure_client()
@@ -309,8 +304,7 @@ def test_close_closes_underlying_client(patched_influx):
         url="http://localhost:8086",
         org="my-org",
         token="my-token",
-        bucket="my-bucket",
-        debug=False, # disable debug to avoid extra prints
+        bucket="my-bucket"
     )
 
     client._ensure_client()

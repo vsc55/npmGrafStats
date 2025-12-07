@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import os
+
 import pytest
 
 from connector.influx import InfluxClient, InfluxRecord
@@ -30,8 +31,7 @@ def influx_client():
         url=INFLUX_HOST,
         org=INFLUX_ORG,
         token=INFLUX_TOKEN,
-        bucket=INFLUX_BUCKET,
-        debug=False,
+        bucket=INFLUX_BUCKET
     )
 
     if not REQUIRE_INFLUX and not client.is_available():

@@ -2,10 +2,12 @@
 """Nginx Proxy Manager integration package."""
 from __future__ import annotations
 
+from math import log
 from typing import Iterable, Literal
 
 from config import GlobalConfig
 from connector.influx import InfluxRecord
+from logger import get_logger
 from tasks import DiscoveryInfo, LineProcessor, ListEnabled, LogTask
 
 from .config import LogsPaths, NpmConfig
@@ -15,6 +17,7 @@ from .types import LogKind
 __version__ = "1.0.0"
 __description__ = "Nginx Proxy Manager integration"
 
+log = get_logger(__name__)
 
 def make_processor(mode: LogKind, config: GlobalConfig) -> LineProcessor:
     """ Creates a line processor for the given log mode. """

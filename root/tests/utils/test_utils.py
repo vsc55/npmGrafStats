@@ -5,50 +5,6 @@
 # pylint: disable=unused-argument
 
 import utils
-import config
-
-# ---------- debug_msg ----------
-
-def test_debug_msg_prints_when_debug_true(monkeypatch):
-    """debug_msg should print when cfg.debug == true."""
-
-    class DummyCfg: # pylint: disable=missing-class-docstring,too-few-public-methods
-        debug = True
-
-    # We replace config.cfg with our dummy
-    monkeypatch.setattr(config, "cfg", DummyCfg(), raising=False)
-
-    printed: list[str] = []
-
-    def fake_print(msg, *args, **kwargs):
-        printed.append(msg)
-
-    # we patch global print
-    monkeypatch.setattr("builtins.print", fake_print)
-
-    utils.debug_msg("hello debug")
-
-    assert printed == ["hello debug"]
-
-
-def test_debug_msg_no_print_when_debug_false(monkeypatch):
-    """debug_msg should not print when cfg.debug == false."""
-    class DummyCfg: # pylint: disable=missing-class-docstring,too-few-public-methods
-        debug = False
-
-    monkeypatch.setattr(config, "cfg", DummyCfg(), raising=False)
-
-    printed: list[str] = []
-
-    def fake_print(msg, *args, **kwargs):
-        printed.append(msg)
-
-    monkeypatch.setattr("builtins.print", fake_print)
-
-    utils.debug_msg("should not appear")
-
-    assert printed == []
-
 
 # ---------- format_time ----------
 
@@ -57,23 +13,6 @@ def test_format_time_valid():
     old = "30/May/2023:14:16:48 +0000"
     new = utils.format_time(old)
     assert new == "2023-05-30T14:16:48+00:00"
-
-
-def test_format_time_invalid_short(monkeypatch):
-    """If the string is invalid or too short, returns None and calls debug_msg."""
-    messages: list[str] = []
-
-    def fake_debug(msg: str):
-        messages.append(msg)
-
-    # We only patched debug_msg inside utils
-    monkeypatch.setattr(utils, "debug_msg", fake_debug)
-
-    result = utils.format_time("bad")
-    assert result is None
-    assert messages  # It was called at least once
-    assert "Invalid time format" in messages[0]
-
 
 # ---------- is_ip_in_range ----------
 
@@ -114,7 +53,7 @@ def test_is_ip_in_range_ignores_comments_and_empty():
 
 def test_is_ip_in_range_invalid_entries():
     """Invalid entries should not raise an exception and should be ignored."""
-    # No need to check debug_msg, just that it doesn't crash and returns False
+    # Invalid entries in the list → ignored
     entries = [
         "not-an-ip",
         "300.300.300.300/24",
