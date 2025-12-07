@@ -178,7 +178,7 @@ class GlobalConfig:
         newcfg.internal_logs = env_bool("INTERNAL_LOGS", False)
         newcfg.monitoring_logs = env_bool("MONITORING_LOGS", False)
 
-        newcfg.monitor_file_path = os.getenv('MONITORING_FILE_PATH') or "/monitoringips.txt"
+        newcfg.monitor_file_path = os.getenv('MONITORING_FILE_PATH', "/monitoringips.txt")
 
         for key, env_name, default in (
             ("url", "INFLUX_URL", ""),
@@ -193,8 +193,8 @@ class GlobalConfig:
 
         newcfg.api_abuseip_key = os.getenv('ABUSEIP_KEY', "")
 
-        newcfg.geo_asn_db_path = os.getenv('GEO_ASN_DB_PATH') or "/geolite/GeoLite2-ASN.mmdb"
-        newcfg.geo_city_db_path = os.getenv('GEO_CITY_DB_PATH') or "/geolite/GeoLite2-City.mmdb"
+        newcfg.geo_asn_db_path = os.getenv('GEO_ASN_DB_PATH', "/geolite/GeoLite2-ASN.mmdb")
+        newcfg.geo_city_db_path = os.getenv('GEO_CITY_DB_PATH', "/geolite/GeoLite2-City.mmdb")
 
         newcfg.lock()
         return newcfg
