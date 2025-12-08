@@ -20,6 +20,7 @@ class LogLevel(Enum):
 
 
 class ColorFormatter(logging.Formatter):
+    """ Custom formatter to add colors to console log output based on log level. """
     COLORS = {
         logging.DEBUG:    "\033[36m",  # cyan
         logging.INFO:     "\033[32m",  # green
@@ -122,14 +123,14 @@ class LogManager:
 
     debug: bool = False
 
-    name: str = "app"
+    name: str = "root"
     initial_level: LogLevel = LogLevel.INFO          # Global logger level
     initial_console_level: LogLevel | None = LogLevel.INFO  # Level for console output
     initial_file_level: LogLevel | None = LogLevel.DEBUG    # Level for file output
     logfile: Optional[str] = None
 
-    format_console: str = "%(levelname)s: %(message)s"
-    format_file: str = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    format_console: str = "%(levelname)s [%(name)s - %(funcName)s:%(lineno)d]: %(message)s"
+    format_file: str = "%(asctime)s [%(levelname)s - %(funcName)s:%(lineno)d] %(name)s: %(message)s"
     date_format_file: str = "%Y-%m-%d %H:%M:%S"
 
     logger: logging.Logger = field(init=False, repr=False)
@@ -351,7 +352,7 @@ class LogManager:
         debug: bool = False
 
         def __init__(self) -> None:
-            self._name = "NPMGrafStatsPythonEdition"
+            self._name = "root"
             self._level = LogLevel.INFO
             self._console_level = LogLevel.INFO
             self._file_level = LogLevel.DEBUG

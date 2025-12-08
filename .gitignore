@@ -122,3 +122,4 @@ docker-compose.override.yml
 .env.dev
 *.mmdb
 .env.test
+/root/tests/data/abuseipdb_cache.json

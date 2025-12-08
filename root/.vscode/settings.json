@@ -3,16 +3,16 @@
     "python.terminal.activateEnvironment": true,
     "python.languageServer": "Pylance",
     "python.analysis.diagnosticMode": "workspace",
-
+    "python.analysis.exclude": [
+        "fcntl"
+    ],
     "python.linting.enabled": true,
     "python.linting.lintOnSave": true,
     "python.linting.ruffEnabled": true,
-
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
         "source.organizeImports": "always"
     },
-
     "files.exclude": {
         "**/__pycache__": true,
         "**/.mypy_cache": true,

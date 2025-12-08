@@ -4,6 +4,7 @@
 # pylint: disable=use-implicit-booleaness-not-comparison
 # pylint: disable=unused-argument
 
+import atexit
 import json
 
 import pytest
@@ -14,7 +15,6 @@ from api.external.abuseipdb.exceptions import (AbuseIPDBConfigError,
                                                AbuseIPDBNetworkError,
                                                AbuseIPDBRateLimitError,
                                                AbuseIPDBResponseError)
-from logger import LogLevel, get_manager
 
 # ---------------------------------------------------------------------------
 # Helpers / Dummy responses
@@ -40,6 +40,24 @@ class DummyBadJSONResponse:
         """ Always raises JSONDecodeError. """
         raise json.JSONDecodeError("Expecting value", "xxx", 0)
 
+
+@pytest.fixture(autouse=True)
+def no_abuseip_atexit():
+    """ Disable the AbuseIPDB atexit handler during tests. """
+    import api.external.abuseipdb.abuseipdb_app as abuseipdb_app  # pylint: disable=import-outside-toplevel
+
+    # Unregister the atexit handler if it is registered
+    try:
+        atexit.unregister(abuseipdb_app.save_abuse_instance)
+    except AttributeError:
+        # Python without unregister -> cannot do it this way
+        pass
+    except ValueError:
+        # handler was not registered -> nothing to do
+        pass
+
+    yield
+    # No re-register anything: in tests you don't want the atexit to run
 
 # ---------------------------------------------------------------------------
 # Tests for properties / basic behaviour
@@ -126,7 +144,7 @@ def test_max_age_in_days_validation():
 
 
 def test_verbose_and_timeout_and_flags():
-    """Check verbose, timeout, debug, show properties."""
+    """Check verbose, timeout properties."""
     abuse = AbuseIPDB()
     abuse.verbose = True
     abuse.timeout = 5
@@ -285,16 +303,17 @@ def test_api_check_http_error_raises_response_error(monkeypatch):
     assert err.api_errors[0]["detail"] == err_detail
 
 
-def test_api_check_http_error_ratelimit(monkeypatch, capsys):
+def test_api_check_http_error_ratelimit(monkeypatch):
     """HTTP 429 -> AbuseIPDBRateLimitError with rate limit info."""
-    # pylint: disable=line-too-long
-
     abuse = AbuseIPDB()
     abuse.key = "KEY123"
     abuse.ip = "8.8.8.8"
 
     err_code = 429
-    err_detail = "Daily rate limit of 3000 requests exceeded for this endpoint. See headers for additional details."
+    err_detail = (
+        "Daily rate limit of 3000 requests exceeded for this endpoint. "
+        "See headers for additional details."
+    )
 
     def fake_request(*args, **kwargs):
         return DummyResponse(
@@ -404,7 +423,7 @@ def test_check_success_path(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_checks_multiple_ips(monkeypatch):
-    """checks() invokes check() for each IP and groups the results."""
+    """checks() must call API for each IP and return list of results."""
     calls = []
 
     def fake_request(method, url, headers, params, timeout):
@@ -455,3 +474,185 @@ def test_checks_mixed_valid_and_invalid_ip(monkeypatch):
 
     assert results[2]["status"] is AbuseIPDBStatusReturn.SUCCESS
     assert results[2]["status_code"] == 200
+
+
+# ---------------------------------------------------------------------------
+# Tests for cache behaviour
+# ---------------------------------------------------------------------------
+
+def test_cache_hit_avoids_second_request(monkeypatch):
+    """
+    Two consecutive calls with the same parameters:
+    the second should use the cache and not call the API again.
+    """
+    abuse = AbuseIPDB()
+    abuse.key = "KEY123"
+    abuse.ip = "8.8.8.8"
+
+    calls = []
+
+    def fake_request(method, url, headers, params, timeout):
+        calls.append(params.get("ipAddress"))
+        # Important: include both fields required by get_from_cache
+        return DummyResponse(
+            200,
+            {
+                "data": {
+                    "abuseConfidenceScore": 10,
+                    "totalReports": 1,
+                },
+                "errors": [],
+            },
+        )
+
+    monkeypatch.setattr(
+        "api.external.abuseipdb.requests.request",
+        fake_request,
+    )
+
+    # First call: goes to the API and caches
+    result1 = abuse.api_check()
+    assert result1["status"] is AbuseIPDBStatusReturn.SUCCESS
+    assert calls == ["8.8.8.8"]
+
+    # Second call: should use the cache and not call the API again
+    result2 = abuse.api_check()
+    assert result2["status"] is AbuseIPDBStatusReturn.SUCCESS
+    assert calls == ["8.8.8.8"]  # there is still only one call
+
+def test_cache_expired_entry(monkeypatch):
+    """
+    If the entry is expired (according to cache_expire),
+    it should be removed from the cache and the API should be called again.
+    """
+    # Force short expiration
+    monkeypatch.setenv("ABUSEIP_CACHE_EXPIRE", "1")  # 1 minute
+
+    # Create the object (will read the new expiration value)
+    abuse = AbuseIPDB()
+    abuse.key = "KEY123"
+    abuse.ip = "8.8.8.8"
+
+    # Fake time to control expiration
+    def fake_time():
+        return fake_time.current
+
+    fake_time.current = 1000.0
+    monkeypatch.setattr("api.external.abuseipdb.time.time", fake_time)
+
+    calls = []
+
+    def fake_request(method, url, headers, params, timeout):
+        calls.append(params.get("ipAddress"))
+        return DummyResponse(
+            200,
+            {
+                "data": {
+                    "abuseConfidenceScore": 10,
+                    "totalReports": 1,
+                },
+                "errors": [],
+            },
+        )
+
+    monkeypatch.setattr(
+        "api.external.abuseipdb.requests.request",
+        fake_request,
+    )
+
+    # First call: goes to the API and caches with timestamp t0
+    abuse.api_check()
+    assert calls == ["8.8.8.8"]
+
+    # Advance time by more than 60 seconds to expire the cache
+    fake_time.current = 1000.0 + 61
+
+    # Second call: should see expired cache and call the API again
+    abuse.api_check()
+    assert calls == ["8.8.8.8", "8.8.8.8"]
+
+def test_cache_load_and_save_and_clear(monkeypatch, tmp_path):
+    """
+    Test that cache is saved to disk and loaded back correctly.
+    """
+    cache_path = tmp_path / "abuseipdb_cache.json"
+    monkeypatch.setenv("ABUSEIP_CACHE_FILE", str(cache_path))
+    monkeypatch.setenv("ABUSEIP_CACHE_EXPIRE", "60")
+
+    fake_data = {
+        "124.85.238.241": {
+            "timestamp": 1765206017.218901,
+            "data": {
+                "ipAddress": "124.85.238.241",
+                "isPublic": True,
+                "ipVersion": 4,
+                "isWhitelisted": None,
+                "abuseConfidenceScore": 10,
+                "countryCode": "JP",
+                "usageType": "Fixed Line ISP",
+                "isp": "Open Computer Network",
+                "domain": "ocn.ne.jp",
+                "hostnames": [],
+                "isTor": False,
+                "totalReports": 15,
+                "numDistinctUsers": 5,
+                "lastReportedAt": None
+            }
+        }
+    }
+
+    # First, create an instance and populate the cache and save to disk
+    abuse = AbuseIPDB()
+    abuse.cache_data = fake_data
+    assert abuse.save_cache() is True
+    assert cache_path.exists()
+
+    # Second, create a new instance which should load the cache from disk
+    abuse2 = AbuseIPDB()
+    assert '124.85.238.241' in abuse2.cache_data
+    cached_response = abuse2.cache_data['124.85.238.241']
+    assert cached_response['data']['abuseConfidenceScore'] == 10
+    assert cached_response['data']['totalReports'] == 15
+
+    # Finally, test that clear_cache() empties the cache and updates the file
+    assert abuse2.clear_cache() is True
+    assert abuse2.cache_data == {}
+    assert cache_path.read_text(encoding="utf-8") == "{}"
+
+def test_load_cache_corrupt_file_renamed(monkeypatch, tmp_path):
+    """
+    If the cache file contains invalid JSON,
+    load_cache() should rename it to *.err-... and leave the cache empty.
+    """
+    cache_path = tmp_path / "abuseipdb_cache.json"
+    monkeypatch.setenv("ABUSEIP_CACHE_FILE", str(cache_path))
+    monkeypatch.setenv("ABUSEIP_CACHE_EXPIRE", "60")
+
+    cache_path.write_text("{ not json }", encoding="utf-8")
+
+    abuse = AbuseIPDB()
+
+    # After __post_init__ + load_cache(), the internal cache should be empty
+    assert abuse.cache_data == {}
+
+    # The original file should have been renamed to *.err-*
+    err_files = list(cache_path.parent.glob(cache_path.name + ".err-*"))
+    assert len(err_files) == 1
+
+def test_cache_file_is_none(monkeypatch):
+    """
+    If ABUSEIP_CACHE_FILE is set to empty string,
+    The cache file should be None and no disk operations should occur.
+    """
+    monkeypatch.setenv("ABUSEIP_CACHE_FILE", "")
+    monkeypatch.setenv("ABUSEIP_CACHE_EXPIRE", "60")
+
+    abuse = AbuseIPDB(_cache_path=None)
+    abuse.cache_path = None
+
+    assert abuse.cache_path is None
+    assert abuse.is_cache_active is False
+    assert abuse.is_cache_set is False
+    assert abuse.load_cache() == {}
+    assert abuse.save_cache() is False
+    assert abuse.clear_cache() is True

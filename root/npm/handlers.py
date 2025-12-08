@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import ipaddress
 import re
-import sys
 from dataclasses import dataclass
 from typing import Optional, TypedDict
 
-from api.external.abuseipdb import AbuseIPDB, AbuseIPDBStatusReturn
+from api.external.abuseipdb.abuseipdb_app import checking
 from api.external.geoip2 import GeoIP2Client
 from api.external.geoip2.exceptions import GeoIP2ConfigError, GeoIP2PathDBError
 from config import GlobalConfig
@@ -245,18 +244,10 @@ class HandlersNPM:
 
     def _get_abuseipdb(self, ip: str) -> dict[str, int]:
         """ Returns AbuseIPDB data for the given IP. """
-        abuse_key = self.config.api_abuseip_key
-        abuse_result = AbuseIPDB.check(ip, key=abuse_key)
-        if abuse_result["status"] is AbuseIPDBStatusReturn.SUCCESS:
-            abuse_confidence_score = abuse_result["data"].get("abuseConfidenceScore", 0)
-            abuse_total_reports = abuse_result["data"].get("totalReports", 0)
-            abuse_return = {
-                "abuseConfidenceScore": str(abuse_confidence_score),
-                "totalReports": str(abuse_total_reports),
-            }
-            return abuse_return
-
-        return {}
+        # abuse_key = self.config.api_abuseip_key
+        # abuse_return = checking(ip, key=abuse_key)
+        abuse_return = checking(ip)
+        return abuse_return
 
     def parse_send_record(self, type_record: TypeSendRecord, record: SendRecord) -> ParsedRecord:
         """
