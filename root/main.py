@@ -2,7 +2,9 @@
 """Main entry point for the npmGrafStats log collector."""
 import atexit
 import os
+import signal
 import sys
+import threading
 import time
 
 from api.external.abuseipdb.abuseipdb_app import (get_abuse_instance,
@@ -18,6 +20,14 @@ from tasks import TasksConfig
 from utils import env_bool, env_int, parse_float
 
 log = get_logger(__name__)
+
+signal_event = threading.Event()
+
+def _handle_sigterm(_signum, _frame):
+    """Handle SIGTERM signal to initiate graceful shutdown."""
+    signal_event.set()
+
+signal.signal(signal.SIGTERM, _handle_sigterm)
 
 def test_connection(cli_influx: InfluxClient) -> bool:
     """Test connection to InfluxDB."""
@@ -133,8 +143,8 @@ def run() -> int:
     # -- Main Loop
     exit_code = 0
     try:
-        while True:
-            time.sleep(60)
+        while not signal_event.is_set():
+            signal_event.wait(timeout=60)
             # Simulate StopAll
             # raise KeyboardInterrupt
 

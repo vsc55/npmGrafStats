@@ -16,6 +16,7 @@ from typing import Any, Optional, TypedDict
 
 import requests
 
+from api.external.abuseipdb.cache_dict import CacheDict
 from logger import LogLevel, get_logger
 
 from .exceptions import (AbuseIPDBConfigError, AbuseIPDBNetworkError,
@@ -130,32 +131,32 @@ class AbuseIPDB:
 
 
     # ----- Cache -----
-    _cache_data_dirty: bool = field(init=False, default=False)
-
     @property
     def is_cache_data_modified(self) -> bool:
         """Check if the cache data has been modified since last load/save."""
-        return self._cache_data_dirty
+        return getattr(self._cache_data, "dirty", False)
 
     def set_cache_data_reset(self) -> None:
         """Reset the cache data modified flag."""
-        self._cache_data_dirty = False
+        if isinstance(self._cache_data, CacheDict):
+            self._cache_data.reset_dirty()
 
     def set_cache_data_modified(self) -> None:
         """Mark the cache data as modified."""
-        self._cache_data_dirty = True
+        if isinstance(self._cache_data, CacheDict):
+            self._cache_data.mark_dirty()
 
 
-    _cache_data: dict[str, Any] = field(default_factory=dict)
+    _cache_data: CacheDict = field(init=False, default_factory=CacheDict)
     @property
-    def cache_data(self) -> dict[str, Any]:
+    def cache_data(self) -> CacheDict:
         """Get the cache data"""
         return self._cache_data
 
     @cache_data.setter
     def cache_data(self, value: dict[str, Any]) -> None:
         """Set the cache data"""
-        self._cache_data = value
+        self._cache_data = CacheDict(value or {})
         self.set_cache_data_modified()
 
     _cache_expire: int | None = None
@@ -372,10 +373,11 @@ class AbuseIPDB:
         if self.is_cache_set is False:
             log.warning("AbuseIPDB cache path is not set; cannot load cache.")
 
-        elif self.is_cache_exist is False:
-            log.warning("AbuseIPDB cache file does not exist at %s", self.cache_path)
-
         else:
+            if self.is_cache_exist is False:
+                log.warning("AbuseIPDB cache file does not exist at %s", self.cache_path)
+                self.clear_cache()
+
             try:
                 with open(self.cache_path, 'r', encoding='utf-8') as cache_file:
                     if fcntl:
@@ -485,7 +487,6 @@ class AbuseIPDB:
             'timestamp': current_time,
             'data': data
         }
-        self.set_cache_data_modified()
 
         if force_save:
             self.save_cache()
@@ -568,8 +569,6 @@ class AbuseIPDB:
 
         if ip_address in self.cache_data:
             del self.cache_data[ip_address]
-            self.set_cache_data_modified()
-            log.info("AbuseIPDB cache entry for IP %s deleted", ip_address)
 
             if force_save:
                 self.save_cache()
