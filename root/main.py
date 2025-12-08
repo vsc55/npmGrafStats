@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Main entry point for the npmGrafStats log collector."""
+import atexit
 import os
 import sys
 import time
 
-from api.external.abuseipdb.abuseipdb_app import get_abuse_instance
+from api.external.abuseipdb.abuseipdb_app import (get_abuse_instance,
+                                                  save_abuse_instance)
 from config import cfg
 from connector.influx import InfluxClient
 from connector.influx.exceptions import InfluxClientConfigError
@@ -53,6 +55,9 @@ def run() -> int:
     log.info("Start Cache for AbuseIPDB...")
     if get_abuse_instance(cfg.api_abuseip_key) is not None:
         log.info("AbuseIPDB Cache started successfully.")
+
+        # Register atexit handler to save cache on exit
+        atexit.register(save_abuse_instance)
     else:
         log.warning("AbuseIPDB Cache could not be started.")
 

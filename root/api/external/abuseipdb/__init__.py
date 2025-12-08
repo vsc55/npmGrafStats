@@ -118,7 +118,7 @@ class AbuseIPDB:
 
     def close(self) -> None:
         """ Close the AbuseIPDB instance and save cache. """
-        self.save_cache()
+        self.maybe_save_cache()
 
     def __enter__(self):
         """ Support for With statement context management. """
@@ -126,10 +126,26 @@ class AbuseIPDB:
 
     def __exit__(self, exc_type, exc, tb):
         """ Support for With statement context management. """
-        self.save_cache()
+        self.maybe_save_cache()
 
 
     # ----- Cache -----
+    _cache_data_dirty: bool = field(init=False, default=False)
+
+    @property
+    def is_cache_data_modified(self) -> bool:
+        """Check if the cache data has been modified since last load/save."""
+        return self._cache_data_dirty
+
+    def set_cache_data_reset(self) -> None:
+        """Reset the cache data modified flag."""
+        self._cache_data_dirty = False
+
+    def set_cache_data_modified(self) -> None:
+        """Mark the cache data as modified."""
+        self._cache_data_dirty = True
+
+
     _cache_data: dict[str, Any] = field(default_factory=dict)
     @property
     def cache_data(self) -> dict[str, Any]:
@@ -140,6 +156,7 @@ class AbuseIPDB:
     def cache_data(self, value: dict[str, Any]) -> None:
         """Set the cache data"""
         self._cache_data = value
+        self.set_cache_data_modified()
 
     _cache_expire: int | None = None
     @property
@@ -171,9 +188,16 @@ class AbuseIPDB:
     @cache_path.setter
     def cache_path(self, value: str | None) -> None:
         """Set the cache file path"""
-        if value is not None:
-            value = value.strip()
-        self._cache_path = value
+        old = self._cache_path
+        if value is None:
+            self._cache_path = None
+            return
+
+        value = value.strip()
+        self._cache_path = value or None
+        if old != self._cache_path:
+            log.debug("AbuseIPDB cache path set to %s", self.cache_path)
+            self.set_cache_data_modified()
 
     @property
     def is_cache_set(self) -> bool:
@@ -339,10 +363,11 @@ class AbuseIPDB:
                 return False
 
         self.cache_data = {}
+        self.set_cache_data_reset()
         log.debug("AbuseIPDB cache cleared at %s", self.cache_path)
         return True
 
-    def load_cache(self) -> dict[str, Any] | None:
+    def load_cache(self) -> dict[str, Any]:
         """ Load the AbuseIPDB cache from file. """
         if self.is_cache_set is False:
             log.warning("AbuseIPDB cache path is not set; cannot load cache.")
@@ -361,6 +386,7 @@ class AbuseIPDB:
 
                 log.debug("AbuseIPDB cache loaded from %s", self.cache_path)
                 self.cache_data = cache_data
+                self.set_cache_data_reset()
                 return cache_data
 
             except FileNotFoundError:
@@ -416,6 +442,7 @@ class AbuseIPDB:
                     fcntl.flock(cache_file.fileno(), fcntl.LOCK_UN)
 
             log.debug("AbuseIPDB cache saved to %s", self.cache_path)
+            self.set_cache_data_reset()
             return True
 
         except (IOError, OSError):
@@ -425,6 +452,11 @@ class AbuseIPDB:
             log.exception("Unexpected error saving cache to '%s'", self.cache_path)
 
         return False
+
+    def maybe_save_cache(self, cache_data: Optional[dict[str, Any]] = None) -> None:
+        """ Save the AbuseIPDB cache to file if modified. """
+        if self.is_cache_data_modified:
+            self.save_cache(cache_data)
 
     def add_to_cache(
             self,
@@ -444,11 +476,16 @@ class AbuseIPDB:
             log.warning("AbuseIPDB cache add requested with empty IP address")
             return False
 
+        if data is None:
+            log.warning("AbuseIPDB cache add requested with None data for IP %s", ip_address)
+            return False
+
         current_time = time.time()
         self.cache_data[ip_address] = {
             'timestamp': current_time,
             'data': data
         }
+        self.set_cache_data_modified()
 
         if force_save:
             self.save_cache()
@@ -467,6 +504,9 @@ class AbuseIPDB:
             log.info("AbuseIPDB cache is not active")
             return None
 
+        if force_load:
+            self.load_cache()
+
         if not self.cache_data:
             log.info("AbuseIPDB cache is empty")
             return None
@@ -477,9 +517,6 @@ class AbuseIPDB:
         if ip_address is None or ip_address.strip() == "":
             log.warning("AbuseIPDB cache requested with empty IP address")
             return None
-
-        if force_load:
-            self.load_cache()
 
         entry = self.cache_data.get(ip_address)
         if not entry:
@@ -531,6 +568,7 @@ class AbuseIPDB:
 
         if ip_address in self.cache_data:
             del self.cache_data[ip_address]
+            self.set_cache_data_modified()
             log.info("AbuseIPDB cache entry for IP %s deleted", ip_address)
 
             if force_save:

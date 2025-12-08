@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """AbuseIPDB application interface."""
-import atexit
-import os
 
 from api.external.abuseipdb import (AbuseIPDB, AbuseIPDBConfigError,
                                     AbuseIPDBNetworkError,
@@ -61,17 +59,12 @@ def checking(ip: str, key: str | None = None) -> dict[str, str]:
         "totalReports": str(abuse_total_reports),
     }
 
-@atexit.register
 def save_abuse_instance() -> None:
     """ Save the AbuseIPDB instance data to disk """
     log.info("Saving AbuseIPDB cache data...")
     abuse = get_abuse_instance()
     if abuse is not None:
-        abuse.close()
-        log.info("AbuseIPDB cache data saved.")
+        abuse.maybe_save_cache()
+        log.info("AbuseIPDB cache data saved successfully.")
     else:
         log.warning("AbuseIPDB: No instance to save.")
-
-# only register the atexit if not mode tested
-# if not os.getenv("ABUSEIP_DISABLE_ATEXIT"):
-#     atexit.register(save_abuse_instance)

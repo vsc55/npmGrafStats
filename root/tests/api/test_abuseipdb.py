@@ -4,7 +4,6 @@
 # pylint: disable=use-implicit-booleaness-not-comparison
 # pylint: disable=unused-argument
 
-import atexit
 import json
 
 import pytest
@@ -39,25 +38,6 @@ class DummyBadJSONResponse:
     def json(self):
         """ Always raises JSONDecodeError. """
         raise json.JSONDecodeError("Expecting value", "xxx", 0)
-
-
-@pytest.fixture(autouse=True)
-def no_abuseip_atexit():
-    """ Disable the AbuseIPDB atexit handler during tests. """
-    import api.external.abuseipdb.abuseipdb_app as abuseipdb_app  # pylint: disable=import-outside-toplevel
-
-    # Unregister the atexit handler if it is registered
-    try:
-        atexit.unregister(abuseipdb_app.save_abuse_instance)
-    except AttributeError:
-        # Python without unregister -> cannot do it this way
-        pass
-    except ValueError:
-        # handler was not registered -> nothing to do
-        pass
-
-    yield
-    # No re-register anything: in tests you don't want the atexit to run
 
 # ---------------------------------------------------------------------------
 # Tests for properties / basic behaviour
@@ -656,3 +636,39 @@ def test_cache_file_is_none(monkeypatch):
     assert abuse.load_cache() == {}
     assert abuse.save_cache() is False
     assert abuse.clear_cache() is True
+
+def test_cache_modified_flag(monkeypatch, tmp_path):
+    """
+    Test that the cache_modified flag is set correctly on modifications,
+    and that save_cache resets it.
+    """
+    cache_path = tmp_path / "abuseipdb_cache.json"
+    monkeypatch.setenv("ABUSEIP_CACHE_FILE", str(cache_path))
+    monkeypatch.setenv("ABUSEIP_CACHE_EXPIRE", "60")
+
+    fake_ip = "8.8.8.8"
+    fake_data = {
+        "ipAddress": "8.8.8.8",
+        "abuseConfidenceScore": 0,
+    }
+
+    abuse = AbuseIPDB()
+
+    # Initially, cache_modified should be False
+    assert abuse.is_cache_data_modified is False
+
+    # After setting a cache entry, it should be True
+    abuse.add_to_cache(fake_data, fake_ip)
+    assert abuse.is_cache_data_modified is True
+
+    # After saving the cache, it should be reset to False
+    abuse.save_cache()
+    assert abuse.is_cache_data_modified is False
+
+    # After deleting an entry, it should be True
+    abuse.del_from_cache(fake_ip)
+    assert abuse.is_cache_data_modified is True
+
+    # After clearing the cache, it should be False (Clean data and save file)
+    abuse.clear_cache()
+    assert abuse.is_cache_data_modified is False
