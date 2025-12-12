@@ -203,9 +203,9 @@ class HandlersNPM:
             geo_data = GeoIP2Client.get_city(ip, db)
             geo_return: dict[str, str | float] = {
                 "key": geo_data["iso_code"],
-                "City": geo_data["city"],
-                "State": geo_data["state"],
-                "Name": geo_data["country"],
+                "city": geo_data["city"],
+                "state": geo_data["state"],
+                "name": geo_data["country"],
                 "latitude": parse_float(geo_data["latitude"], 0.0),
                 "longitude": parse_float(geo_data["longitude"], 0.0),
             }
@@ -244,8 +244,6 @@ class HandlersNPM:
 
     def _get_abuseipdb(self, ip: str) -> dict[str, int]:
         """ Returns AbuseIPDB data for the given IP. """
-        # abuse_key = self.config.api_abuseip_key
-        # abuse_return = checking(ip, key=abuse_key)
         abuse_return = checking(ip)
         return abuse_return
 
@@ -266,19 +264,25 @@ class HandlersNPM:
 
         # Set default values for tags and fields
         tags = {
-            "Domain": domain,
-            "IP": ip,
-            "Target": target_ip,
-            "StatusCode": status_code,
-        }
-        fields = tags.copy()
-        fields.update({
-            "length": length,
+            "domain": domain,
+            "ip": ip,
+            "target": target_ip,
             "statuscode": status_code,
             "method": method,
             "scheme": scheme,
-            "uri": uri,
             "agent": agent,
+        }
+        fields = tags.copy()
+        fields.update({
+            "domain": domain,
+            "ip": ip,
+            "target": target_ip,
+            "statuscode": status_code,
+            "method": method,
+            "scheme": scheme,
+            "agent": agent,
+            "uri": uri,
+            "length": length,
             "metric": 1
         })
 
@@ -299,8 +303,8 @@ class HandlersNPM:
 
                 asn_data = self._get_geoip2asn(ip, asn_flag)
                 if asn_data:
-                    tags["Asn"] = asn_data["org"]
-                    fields["Asn"] = asn_data["org"]
+                    tags["asn"] = asn_data["org"]
+                    fields["asn"] = asn_data["org"]
 
                 abuse_result = self._get_abuseipdb(ip)
                 if abuse_result:
