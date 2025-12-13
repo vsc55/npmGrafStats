@@ -141,12 +141,16 @@ class LogWatcherManager:
 
             # scale up
             if q > HIGH_Q and n < MAX_WRITERS:
-                log.warning("[Autoscaler] Scaling up writers: Queue=%d, Writers=%d -> %d", q, n, n+1)
+                log.warning(
+                    "[Autoscaler] Scaling up writers: Queue=%d, Writers=%d -> %d", q, n, n+1
+                )
                 self._start_writer()
 
             # scale down
             elif q < LOW_Q and n > MIN_WRITERS:
-                log.warning("[Autoscaler] Scaling down writers: Queue=%d, Writers=%d -> %d", q, n, n-1)
+                log.warning(
+                    "[Autoscaler] Scaling down writers: Queue=%d, Writers=%d -> %d", q, n, n-1
+                )
 
                 # send a sentinel -> one writer will stop itself
                 self.queue.put(SENTINEL)

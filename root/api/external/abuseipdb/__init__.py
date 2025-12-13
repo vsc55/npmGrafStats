@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import pathlib
 import sys
 import time
 import traceback
@@ -216,6 +217,10 @@ class AbuseIPDB:
         """Check if the cache is active (path set and expiration > 0)"""
         return self.is_cache_set and self.is_cache_expire_set
 
+    def mkdir_cache_path(self) -> None:
+        """Create the directory for the cache file if it doesn't exist"""
+        if self.is_cache_set:
+            pathlib.Path(self.cache_path).parent.mkdir(parents=True, exist_ok=True)
 
     # ----- API URL -----
     _url : str = field(default="https://api.abuseipdb.com/api/v2/check")
@@ -352,6 +357,8 @@ class AbuseIPDB:
             log.warning("AbuseIPDB cache path is not set; cannot clean cache file, only memory.")
         else:
             try:
+                self.mkdir_cache_path()
+
                 with open(self.cache_path, 'w', encoding='utf-8') as cache_file:
                     if fcntl:
                         fcntl.flock(cache_file.fileno(), fcntl.LOCK_EX)
@@ -436,6 +443,8 @@ class AbuseIPDB:
             return False
 
         try:
+            self.mkdir_cache_path()
+
             with open(self.cache_path, 'w', encoding='utf-8') as cache_file:
                 if fcntl:
                     fcntl.flock(cache_file.fileno(), fcntl.LOCK_EX)
