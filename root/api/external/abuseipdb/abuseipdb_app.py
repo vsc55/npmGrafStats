@@ -55,8 +55,8 @@ def checking(ip: str, key: str | None = None) -> dict[str, str]:
     abuse_total_reports = payload.get("totalReports", 0)
 
     return {
-        "abuseConfidenceScore": str(abuse_confidence_score),
-        "totalReports": str(abuse_total_reports),
+        "abuse_confidence_score": str(abuse_confidence_score),
+        "total_reports": str(abuse_total_reports),
     }
 
 def save_abuse_instance() -> None:
