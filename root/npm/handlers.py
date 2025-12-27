@@ -31,8 +31,14 @@ class SendRecord(TypedDict):
     ip: str
     domain: str
     length: int
-    target_ip: str
+    target: str
     asn: bool
+    status_code: str | None
+    method: str
+    scheme: str
+    uri: str
+    agent: str
+
 
 class HandlersNPM:
     """ NPM Handlers class to manage log processing with configuration. """
@@ -42,6 +48,47 @@ class HandlersNPM:
         self.line = line
         self.mode = mode
 
+
+    def normalize_nginx_str(self, value: str | None, default: str | None = "") -> str | None:
+        """ Normalizes NGINX log fields, converting None or '-' to default string. """
+        if value in (None, "-"):
+            return default
+        return value
+
+    def normalize_nginx_int(self, value: str | None, default: int = 0) -> int:
+        """ Normalizes NGINX log fields, converting None or '-' to default integer. """
+        if value in (None, "-"):
+            return default
+        return int(value)
+
+    def normalize_nginx_time(self, value: str | None) -> str:
+        """ Normalizes NGINX log time fields to ISO 8601 format or empty string. """
+        if not value or value == "-":
+            return ""
+        return format_time(value) or ""
+
+    def normalize_nginx_ip(self, value: str | None, default: str | None = None) -> str | None:
+        """ Normalizes NGINX log IP fields, extracting the first valid IP or returning default. """
+        if value in (None, "-"):
+            return default
+
+        pattern = Regex.compile_type(TypeRegex.IP)
+        matches = [m.group(0) for m in pattern.finditer(value)]
+
+        return matches[0] if len(matches) > 0 else None
+
+    def normalize_nginx_domain(self, value: str | None, default: str | None = None) -> str | None:
+        """
+        Normalizes NGINX log domain fields, extracting the first valid domain or returning default.
+        """
+        if value in (None, "-"):
+            return default
+
+        pattern = Regex.compile_type(TypeRegex.DOMAIN)
+        matches = [m.group(0) for m in pattern.finditer(value)]
+
+        return matches[0] if len(matches) > 0 else None
+
     def search_in_line(self, line: Optional[str] = None) -> dict[str, str]:
         """ Returns basic info about the handler. """
         if line is None:
@@ -49,7 +96,7 @@ class HandlersNPM:
 
         log_regex = re.compile(
             r'^\[(?P<time_local>[^\]]+)\]\s+'
-            r'(?:(?P<upstream_cache_status>\S+)\s+(?P<upstream_status>\S+)\s+)?'  # opcional (proxy)
+            r'(?:(?P<upstream_cache_status>\S+)\s+(?P<upstream_status>\S+)\s+)?'  # only proxy
             r'(?P<status>\d{3})\s+-\s+'
             r'(?P<method>\S+)\s+'
             r'(?P<scheme>\S+)\s+'
@@ -58,7 +105,7 @@ class HandlersNPM:
             r'\[Client\s+(?P<client>[^\]]+)\]\s+'
             r'\[Length\s+(?P<length>[^\]]+)\]\s+'
             r'\[Gzip\s+(?P<gzip>[^\]]+)\]'
-            r'(?:\s+\[Sent-to\s+(?P<sent_to>[^\]]+)\])?\s*'  # opcional (solo proxy)
+            r'(?:\s+\[Sent-to\s+(?P<sent_to>[^\]]+)\])?\s*'  # only proxy
             r'"(?P<user_agent>[^"]*)"\s+'
             r'"(?P<referer>[^"]*)"'
         )
@@ -69,90 +116,41 @@ class HandlersNPM:
             data = m.groupdict()
             log.debug("Parsed log data: %s", data)
 
-        method = data.get("method", "")
-        scheme = data.get("scheme", "")
-        uri = data.get("uri", "")
-        agent = data.get("user_agent", "")
+        time_local: str = self.normalize_nginx_time(data.get("time_local"))
 
-        outside_ip, target_ip = self.extract_ips(line)
+        upstream_cache_statuscode: str = self.normalize_nginx_str(data.get("upstream_cache_status"))
+        upstream_statuscode: str = self.normalize_nginx_str(data.get("upstream_status"))
+        statuscode: str = self.normalize_nginx_str(data.get("status"))
+
+        method: str = self.normalize_nginx_str(data.get("method"))
+        scheme: str = self.normalize_nginx_str(data.get("scheme"))
+        host: str = self.normalize_nginx_domain(data.get("host"))
+        uri: str = self.normalize_nginx_str(data.get("uri"))
+
+        client_ip = self.normalize_nginx_ip(data.get("client"), None)
+        length: int = self.normalize_nginx_int(data.get("length"), 0)
+        sent_to_ip = self.normalize_nginx_ip(data.get("sent_to"), None)
+        sent_to_domain = self.normalize_nginx_domain(data.get("sent_to"), None)
+        agent: str = self.normalize_nginx_str(data.get("user_agent"))
+
+        sent_to = sent_to_ip if sent_to_ip else sent_to_domain
+
         return {
-            "outside_ip": outside_ip,
-            "target_ip": target_ip,
-            "domain": self.extract_domain(line),
-            "length": self.extract_length(line),
-            "measurement_time": self.extract_measurement_time(line),
-            "status_code": self.extract_status_code(line),
+            "outside_ip": client_ip,
+            "target": sent_to,
+            "target_ip": sent_to_ip,
+            "target_domain": sent_to_domain,
+            "measurement_time": time_local,
+            "upstream_cache_statuscode": upstream_cache_statuscode,
+            "upstream_statuscode": upstream_statuscode,
+            "status_code": statuscode,
             "method": method,
             "scheme": scheme,
+            "domain": host,
             "uri": uri,
+            "length": length,
             "agent": agent,
         }
-
-
-    def extract_status_code(self, line: Optional[str] = None) -> int | None:
-        """
-        Extracts the status code from the log line.
-        """
-        if line is None:
-            line = self.line
-
-        parts: list[str] = line.strip().split()
-        if len(parts) >= 4:
-            m = re.search(r"\d+", parts[3])
-            if m:
-                return int(m.group(0))
-        return None
-
-    def extract_ips(self, line: Optional[str] = None) -> tuple[str | None, str | None]:
-        """
-        Extracts the outside IP and target IP from the log line.
-        """
-        if line is None:
-            line = self.line
-
-        pattern = Regex.compile_type(TypeRegex.IP)
-        matches = [m.group(0) for m in pattern.finditer(line)]
-
-        outside_ip = matches[0] if len(matches) > 0 else None
-        target_ip = matches[1] if len(matches) > 1 else None
-        return outside_ip, target_ip
-
-    def extract_domain(self, line: Optional[str] = None) -> str:
-        """
-        Extracts the domain from the log line.
-        """
-        if line is None:
-            line = self.line
-
-        m = Regex.search_type(line, TypeRegex.DOMAIN)
-        return m.group(0) if m else ""
-
-    def extract_length(self, line: Optional[str] = None) -> int:
-        """
-        Extracts the length from the 14th field of the log line.
-        Equivalente al bash:
-        length=`echo $line | awk -F ' ' '{print$14}' | grep -m1 -o '[[:digit:]]*'`
-        """
-        if line is None:
-            line = self.line
-
-        parts = line.strip().split()
-        if len(parts) >= 14:
-            m = re.search(r"\d+", parts[13])
-            if m:
-                return int(m.group(0))
-        return 0
-
-    def extract_measurement_time(self, line: Optional[str] = None) -> str:
-        """
-        Extracts the measurement time from the log line and set it to ISO 8601 format.
-        """
-        if line is None:
-            line = self.line
-
-        measurement_time = line[1:27] if len(line) > 27 else ""
-        measurement_time = format_time(measurement_time)
-        return measurement_time or ""
 
     def is_internal_ip(self, ip: str) -> bool:
         """
@@ -254,7 +252,7 @@ class HandlersNPM:
         ip = record.get("ip", "")
         domain = record.get("domain", "")
         length = int(record.get("length", 0))
-        target_ip = record.get("target_ip", "")
+        target = record.get("target", "")
         asn_flag = record.get("asn", False)
         status_code: int | None = record.get("status_code", None)
         method: str = record.get("method", "")
@@ -266,7 +264,7 @@ class HandlersNPM:
         tags = {
             "domain": domain,
             "ip": ip,
-            "target": target_ip,
+            "target": target,
             "statuscode": status_code,
             "method": method,
             "scheme": scheme,
@@ -276,7 +274,7 @@ class HandlersNPM:
         fields.update({
             "domain": domain,
             "ip": ip,
-            "target": target_ip,
+            "target": target,
             "statuscode": status_code,
             "method": method,
             "scheme": scheme,
@@ -326,15 +324,15 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
     result_line = handlers.search_in_line()
 
     outside_ip = result_line["outside_ip"]
-    target_ip = result_line["target_ip"] or ""
+    target = result_line["target"]
     domain = result_line["domain"]
     length = result_line["length"]
     measurement_time = result_line["measurement_time"]
 
     log.debug(
-        "Parsed line - outside_ip: %s, target_ip: %s, domain: %s, length: %d, measurement_time: %s",
+        "Parsed line - outside_ip: %s, target: %s, domain: %s, length: %d, measurement_time: %s",
         outside_ip,
-        target_ip,
+        target,
         domain,
         length,
         measurement_time,
@@ -349,13 +347,13 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
     send_record: SendRecord | None = None
 
     rec_length = length
-    rec_target = target_ip
+    rec_target = target
     rec_asn = True
 
     # 1) IP internal
     if handlers.is_internal_ip(outside_ip):
-        # Igual que el bash: SOLO se manda a InternalRProxyIPs si INTERNAL_LOGS=TRUE,
-        # pero NUNCA pasa a Monitoring o ReverseProxy/Redirections.
+        # Same as bash: only if INTERNAL_LOGS=TRUE it's sent to InternalRProxyIPs,
+        # and NEVER to Monitoring or ReverseProxy/Redirections.
 
         if config.internal_logs is False:
             log.info("[%s] Internal IP-Source: %s called: %s, skipping", mode, outside_ip, domain)
@@ -389,7 +387,7 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
         if mode == "proxy":
             measurement = "ReverseProxyConnections"
             rec_length = length
-            rec_target = target_ip
+            rec_target = target
 
         elif mode == "redirection":
             measurement = "Redirections"
@@ -411,7 +409,7 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
         "ip": outside_ip,
         "domain": domain,
         "length": rec_length,
-        "target_ip": rec_target,
+        "target": rec_target,
         "asn": rec_asn,
         "status_code": result_line["status_code"],
         "method": result_line["method"],
