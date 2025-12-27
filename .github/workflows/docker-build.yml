@@ -35,7 +35,10 @@ jobs:
         run: pytest -q
 
       # --- DOCKER BUILD / PUSH ---
+      
+      # Set up QEMU is needed is the compilation is not amd64
       - name: Set up QEMU
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: docker/setup-qemu-action@v3
         
       - name: Set up Docker Buildx
