@@ -236,6 +236,26 @@ class NginxLogGenerator:
 
         return random.choice(pool)
 
+    # ---------- upstream selection ----------
+    def _rand_upstream_ip(self) -> str:
+        base = random.choice(self.PRIVATE_IP_RANGES)
+        ip = f"{base[0]}.{base[1]}.{random.randint(0,255)}.{random.randint(1,254)}"
+
+        # 30% chance of port
+        if random.random() < 0.3:
+            port = random.choice([80, 443, 8080, 8443, 3000, 5000])
+            return f"{ip}:{port}"
+
+        return ip
+
+    def _choose_upstream(self, host: str, ip_ratio: float = 0.2) -> str:
+        if random.random() < ip_ratio:
+            return self._rand_upstream_ip()
+        # DNS
+        if host.startswith("www."):
+            return host.replace("www.", "srv.", 1)
+        return f"{host}.srv"
+
     # ---------- otras piezas ----------
 
     def _choose_method(self) -> str:
@@ -248,7 +268,7 @@ class NginxLogGenerator:
 
         return random.choices(methods, weights=weights, k=1)[0]
 
-    def _choose_status(self) -> int:
+    def _choose_status(self) -> tuple[int, dict]:
         codes = list(self.STATUS_DISTRIBUTION.keys())
         weights = [self.STATUS_DISTRIBUTION[c]["weight"] for c in codes]
         code = random.choices(codes, weights=weights, k=1)[0]
@@ -286,6 +306,7 @@ class NginxLogGenerator:
         host = self._choose_host()
         path = self._choose_path_for_host(host)
         client_ip = self._get_client_ip()
+        upstream_host = self._choose_upstream(host)
 
         # size by config (e.g. 499 -> 0)
         if status_cfg.get("length_zero", False):
@@ -294,11 +315,6 @@ class NginxLogGenerator:
             size = self._estimate_size(path, status)
 
         gzip_flag = "-"
-
-        if host.startswith("www."):
-            upstream_host = host.replace("www.", "srv.", 1)
-        else:
-            upstream_host = f"{host}.srv"
 
         ua = random.choice(self.USER_AGENTS)
         ref = self._choose_referrer(host)

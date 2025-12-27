@@ -33,7 +33,7 @@ class SendRecord(TypedDict):
     length: int
     target: str
     asn: bool
-    status_code: str | None
+    status_code: str
     method: str
     scheme: str
     uri: str
@@ -55,7 +55,7 @@ class HandlersNPM:
             return default
         return value
 
-    def normalize_nginx_int(self, value: str | None, default: int = 0) -> int:
+    def normalize_nginx_int(self, value: str | None, default: int | None = 0) -> int | None:
         """ Normalizes NGINX log fields, converting None or '-' to default integer. """
         if value in (None, "-"):
             return default
@@ -254,7 +254,7 @@ class HandlersNPM:
         length = int(record.get("length", 0))
         target = record.get("target", "")
         asn_flag = record.get("asn", False)
-        status_code: int | None = record.get("status_code", None)
+        status_code: str = record.get("status_code", "")
         method: str = record.get("method", "")
         scheme: str = record.get("scheme", "")
         uri: str = record.get("uri", "")
