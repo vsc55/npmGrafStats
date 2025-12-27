@@ -34,6 +34,8 @@ class SendRecord(TypedDict):
     target: str
     asn: bool
     status_code: str
+    upstream_statuscode: str
+    upstream_cache_statuscode: str
     method: str
     scheme: str
     uri: str
@@ -267,6 +269,8 @@ class HandlersNPM:
         target = record.get("target", "")
         asn_flag = record.get("asn", False)
         status_code: str = record.get("status_code", "")
+        upstream_statuscode: str = record.get("upstream_statuscode", "")
+        upstream_cache_statuscode: str = record.get("upstream_cache_statuscode", "")
         method: str = record.get("method", "")
         scheme: str = record.get("scheme", "")
         uri: str = record.get("uri", "")
@@ -278,6 +282,8 @@ class HandlersNPM:
             "ip": ip,
             "target": target,
             "statuscode": status_code,
+            "upstream_statuscode": upstream_statuscode,
+            "upstream_cache_statuscode": upstream_cache_statuscode,
             "method": method,
             "scheme": scheme,
             "agent": agent,
@@ -288,6 +294,8 @@ class HandlersNPM:
             "ip": ip,
             "target": target,
             "statuscode": status_code,
+            "upstream_statuscode": upstream_statuscode,
+            "upstream_cache_statuscode": upstream_cache_statuscode,
             "method": method,
             "scheme": scheme,
             "agent": agent,
@@ -427,6 +435,8 @@ def handle_line(line: str, mode: LogKind, config: GlobalConfig) -> list[InfluxRe
         "target": rec_target,
         "asn": rec_asn,
         "status_code": result_line["status_code"],
+        "upstream_statuscode": result_line["upstream_statuscode"],
+        "upstream_cache_statuscode": result_line["upstream_cache_statuscode"],
         "method": result_line["method"],
         "scheme": result_line["scheme"],
         "uri": result_line["uri"],
