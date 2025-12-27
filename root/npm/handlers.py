@@ -5,7 +5,7 @@ from __future__ import annotations
 import ipaddress
 import re
 from dataclasses import dataclass
-from typing import Optional, TypedDict
+from typing import Any, Optional, TypedDict
 
 from api.external.abuseipdb.abuseipdb_app import checking
 from api.external.geoip2 import GeoIP2Client
@@ -245,6 +245,18 @@ class HandlersNPM:
         abuse_return = checking(ip)
         return abuse_return
 
+    def _rename_keys_title_case(self, data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Renames dictionary keys using Python's built-in str.title().
+
+        Examples:
+            'statuscode'     -> 'Statuscode'
+            'user_agent'     -> 'User_Agent'
+            'geo.location'   -> 'Geo.Location'
+            'USER.NAME_test' -> 'User.Name_Test'
+        """
+        return {k.title(): v for k, v in data.items()}
+
     def parse_send_record(self, type_record: TypeSendRecord, record: SendRecord) -> ParsedRecord:
         """
         Parses the SendRecord and writes the point to InfluxDB.
@@ -311,6 +323,9 @@ class HandlersNPM:
 
             case _:
                 pass
+
+        # Rename keys from tags to title case
+        tags = self._rename_keys_title_case(tags)
 
         return ParsedRecord(tags=tags, fields=fields)
 
