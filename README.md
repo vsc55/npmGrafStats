@@ -174,7 +174,7 @@ All configuration is done through environment variables:
 | `LOG_LEVEL` | Global log level (default `INFO`) |
 | `LOG_CONSOLE_LEVEL` | Console log level (default `INFO`) |
 | `LOG_FILE_LEVEL` | File log level (default `DEBUG`) |
-| `LOG_FILE` | Path to log file (default: None) |
+| `LOG_FILE` | Path to log file (default: `None`) |
 
 **Note:** The supported log levels are `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
 
