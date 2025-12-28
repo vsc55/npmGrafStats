@@ -83,7 +83,7 @@ class GlobalConfig:
     api_abuseip_key: str = ""
 
     # ------- Monitoring IPs file path --------
-    _monitor_file_path: str = field(init=False, repr=False, default="/monitoringips.txt")
+    _monitor_file_path: str = field(init=False, repr=False, default="")
     @property
     def monitor_file_path(self) -> str:
         """ Get the Monitor file path. """
@@ -179,7 +179,7 @@ class GlobalConfig:
         newcfg.internal_logs = env_bool("INTERNAL_LOGS", False)
         newcfg.monitoring_logs = env_bool("MONITORING_LOGS", False)
 
-        newcfg.monitor_file_path = os.getenv('MONITORING_FILE_PATH', "/monitoringips.txt")
+        newcfg.monitor_file_path = os.getenv('MONITORING_FILE_PATH', "/data/monitoringips.txt")
 
         for key, env_name, default in (
             ("url", "INFLUX_URL", ""),

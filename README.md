@@ -20,15 +20,14 @@
   </a>
 </div>
 
-# npmGrafStats (Python Rewrite)
+# npmGrafStats (Python)
 
 This project analyzes the logs of **Nginx Proxy Manager** and exports them to **InfluxDB** to be used in a **Grafana dashboard**.
 
-This repository is a **fork of [smilebasti/npmGrafStats (npmPlus-main branch)](https://github.com/smilebasti/npmGrafStats/tree/npmPlus-main)** and has been:
+This repository is a **fork of [smilebasti/npmGrafStats](https://github.com/smilebasti/npmGrafStats/tree/main)** and has been:
 
 - **completely rewritten from scratch in Python**
 - refactored to use a **multi-threaded** architecture
-- designed to run with **no external Python dependencies** (standard library only)
 
 The goal is to keep the original behaviour (parsing NPM logs and feeding InfluxDB/Grafana) while simplifying the runtime and improving performance.
 
@@ -52,16 +51,17 @@ This Python rewrite includes all key features from the original project, plus se
 - 📈 **Real-time statistics** exported to InfluxDB for use in Grafana
 - 🧩 **Support for Nginx Proxy Manager**
 - 🌐 **GeoIP integration** using `GeoLite2-City.mmdb` and `GeoLite2-ASN.mmdb`
+- 📍 **AbuseIPDB** check ip in AbuseIPDBN and implement cache.
 - ⚙️ **Configurable log sources** for multiple proxy hosts or redirect logs
 - 🚫 **Exclude unwanted IPs** (e.g. uptime checks, monitoring services)
 - 🕓 **Accurate measurement timestamps** for each parsed request
-- 🧠 **Tagging and aggregation** for Grafana dashboards (source IP, target IP, domain, location, etc.). 
+- 🧠 **Tagging and aggregation** for Grafana dashboards (source IP, target IP, domain, location, etc...).
   - 🔔 **New!** Status Code, Uri, Method (GET, POST, etc...), Scheme, User Agent.
 
 ### Enhancements in the Python version
 
 - 🧵 **Multi-threaded log parsing** and InfluxDB writes for better performance
-- 🐍 **Pure Python implementation** using only the standard library
+- 🐍 **Pure Python code** using only code python
 - ⚡ **Optimized I/O** for handling large or continuous log files
 - 🔒 **Simpler configuration and deployment** via Docker and environment variables
 - 🧰 **Cross-platform** (Linux, macOS, Windows, ARM/AMD64 compatible)
@@ -75,13 +75,22 @@ This Python rewrite includes all key features from the original project, plus se
 Each log entry produces a structured record containing:
 
 - **Source IP**
-- **Target IP** (internal NPM mapping)
+- **Target IP/FQDN** (internal NPM mapping)
 - **Domain name**
 - **Timestamp**
+- **AbuseIPDB**
+- **StatusCode**
+- **Method**
+- **Scheme**
+- **User Agent**
+- **Length**
+- **Uri**
 - **GeoIP data** (from `GeoLite2-City.mmdb` if enabled):
-  - Country  
-  - Coordinates  
-  - City  
+  - Country
+  - Coordinates
+  - City
+- **GeoIP data** (from `GeoLite2-ASN.mmdb` if enabled):
+  - Organizatio
 
 > Note: GeoIP requires a valid `GeoLite2-City.mmdb` and `GeoLite2-ASN.mmdb` files and configured paths.
 
@@ -143,23 +152,31 @@ After starting, the container will continuously read NPM logs, process them in p
 All configuration is done through environment variables:
 
 | Variable | Description |
-|-----------|--------------|
-| `DEBUG` | When activated, messages will be displayed about what is happening. (default `false`) |
+| ----------- | -------------- |
 | `INFLUX_URL` | URL of your InfluxDB instance |
 | `INFLUX_ORG` | Organization name (InfluxDB v2) (default `npmgrafstats`) |
 | `INFLUX_BUCKET` | Target bucket/database (default `npmgrafstats`) |
 | `INFLUX_TOKEN` | InfluxDB API token |
 | `INFLUX_RETRY_CONNECT` | (default `10`) |
 | `INFLUX_RETRY_DELAY` | (default `5`) |
-| `MONITORING_FILE_PATH` | File Monotoring IP's, (default `/monitoringips.txt`) |
+| `ABUSEIP_KEY` | API key for AbuseIPDB (if used) |
+| `ABUSEIP_CACHE_EXPIRE` | Expiration time in minutes for AbuseIPDB cache (default: `2880`) |
+| `ABUSEIP_CACHE_FILE` | Path to AbuseIPDB cache file (default: `/data/abuseipdb_cache.json`) |
 | `GEO_ASN_DB_PATH` | Path to `GeoLite2-ASN.mmdb` (default `/geolite/GeoLite2-ASN.mmdb`) |
 | `GEO_CITY_DB_PATH` | Path to `GeoLite2-City.mmdb` (default `/geolite/GeoLite2-City.mmdb`) |
+| `MONITORING_FILE_PATH` | File Monotoring IP's, (default `/data/monitoringips.txt`) |
 | `NPM_LOGS_PATH` | Path to Nginx Proxy Manager logs (default `/logs`) |
-| `PROXY_LOGS` | (default `true`) |
-| `REDIRECT_LOGS` |  (default `true`) |
-| `PUBLIC_LOGS` |  (default `true`) |
-| `INTERNAL_LOGS` |  (default `false`) |
-| `MONITORING_LOGS` |  (default `false`) |
+| `PROXY_LOGS` | Enable proxy logs (default `true`) |
+| `REDIRECT_LOGS` | Enable redirection logs (default `true`) |
+| `MONITORING_LOGS` | Enable monitoring logs (default `false`) |
+| `PUBLIC_LOGS` | Enable public logs (default `true`) |
+| `INTERNAL_LOGS` | Enable internal logs (default `false`) |
+| `LOG_LEVEL` | Global log level (default `INFO`) |
+| `LOG_CONSOLE_LEVEL` | Console log level (default `INFO`) |
+| `LOG_FILE_LEVEL` | File log level (default `DEBUG`) |
+| `LOG_FILE` | Path to log file (default: None) |
+
+**Note:** The supported log levels are `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
 
 ---
 
@@ -168,10 +185,23 @@ All configuration is done through environment variables:
 The exported data structure is designed to remain compatible with the original npmGrafStats dashboards:
 
 - Measurement name: `npm_requests`,
-- Tags: `IP`, `Target`, `Domain`, `StatusCode`, `key`, `City`, `State`, `Name`, `latitude`, `longitude`, `Asn`, `abuseConfidenceScore`, `totalReports`
-- Fields: `length`, `statuscode`, `method`, `scheme`, `uri`, `agent`, `metric`, `key`, `City`, `State`, `Name`,  `latitude`, `longitude`,  `Asn`, `abuseConfidenceScore`, `totalReports`
+- Tags: `Ip`, `Target`, `Domain`, `Statuscode`, `Method`, `Scheme`, `Agent`, `Key`, `City`, `State`, `Name`, `Latitude`, `Longitude`, `Asn`, `Abuse_Confidence_Score`, `Abuse_Total_Reports`
+- Fields: `ip`, `target`, `domain`, `statuscode`, `method`, `scheme`, `agent`, `uri`, `length`, `metric`, `key`, `city`, `state`, `name`,  `latitude`, `longitude`,  `asn`, `abuse_confidence_score`, `abuse_total_reports`
 
-You can import the original Grafana dashboards and point them to the new InfluxDB data source.
+> ---
+> ⚠️ **Important notice**
+>
+> With the migration to the new system, changes have been made to the structure of **tags** and **fields** in InfluxDB.
+>
+> These changes are **not 100% compatible with previous versions**, therefore:
+>
+> - Existing queries may stop working or return different results.  
+> - Dashboards and scripts may require updates.  
+> - Integrations depending on the previous schema may be affected.
+>
+> It is strongly recommended to **review and validate queries, dashboards, and data pipelines** before assuming full backward compatibility.
+>
+> ---
 
 Example Grafana view after a few hours of data collection:
 
@@ -185,7 +215,7 @@ Example Grafana view after a few hours of data collection:
 
 ---
 
-## Origin
+## Source
 
 - Original repository: [smilebasti/npmGrafStats](https://github.com/smilebasti/npmGrafStats)  
 

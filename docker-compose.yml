@@ -39,25 +39,27 @@ services:
     image: vsc55/npmgraf:test
     restart: unless-stopped
     environment:
-      DEBUG: false
-      
       INFLUX_URL: "http://influxdb:8086"
       INFLUX_ORG: "${INFLUX_ORG}"
       INFLUX_BUCKET: "${INFLUX_BUCKET}"
       INFLUX_TOKEN: "${INFLUXDB_ADMIN_TOKEN}"
       INFLUX_RETRY_CONNECT: 10
       INFLUX_RETRY_DELAY: 5
+
       ABUSEIP_KEY: "${ABUSEIP_KEY}"
+      ABUSEIP_CACHE_EXPIRE: 2880    # in minutes
 
       PROXY_LOGS: "TRUE"
       REDIRECT_LOGS: "TRUE"
       MONITORING_LOGS: "TRUE"
       INTERNAL_LOGS: "TRUE"
       PUBLIC_LOGS: "TRUE"
+
     volumes:
-      - ./data/logs:/logs
-      - ./geolite:/geolite
-      - ./monitoringips.txt:/monitoringips.txt # optional only mount if preexists and a wanted feature
+      - ./data/logs:/logs                                   # Mount for NPM logs
+      - ./geolite:/geolite                                  # Optional, Mount for GeoLite2 databases
+      - ./monitoringips.txt:/data/monitoringips.txt         # Optional, Mount for monitoring IPs list
+      - ./abuseipdb_cache.json:/data/abuseipdb_cache.json   # Optional, Mount for AbuseIPDB cache
     depends_on:
       - geoipupdate
       - npm
