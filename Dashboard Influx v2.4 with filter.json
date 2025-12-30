@@ -3,7 +3,7 @@
   "kind": "Dashboard",
   "metadata": {
     "name": "npmGraf_Python_lab",
-    "generation": 273,
+    "generation": 274,
     "creationTimestamp": "2025-12-07T19:03:18Z",
     "labels": {},
     "annotations": {}
@@ -1019,7 +1019,7 @@
                     {
                       "targetBlank": true,
                       "title": "Info IP",
-                      "url": "https://bgp.he.net/ip/${__data.fields.ip}#_ipinfo"
+                      "url": "https://bgp.he.net/ip/${__data.fields.Ip}#_ipinfo"
                     }
                   ],
                   "thresholds": {
