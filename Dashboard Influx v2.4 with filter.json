@@ -3,7 +3,7 @@
   "kind": "Dashboard",
   "metadata": {
     "name": "npmGraf_Python_lab",
-    "generation": 264,
+    "generation": 273,
     "creationTimestamp": "2025-12-07T19:03:18Z",
     "labels": {},
     "annotations": {}
@@ -64,7 +64,7 @@
                         "measurement": "ReverseProxyConnections",
                         "orderByTime": "ASC",
                         "policy": "default",
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"domain\")\r\n  |> group(columns: [\"Domain\"])\r\n  |> count()\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])",
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"domain\")\r\n  |> group(columns: [\"Domain\"])\r\n  |> count()\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])",
                         "resultFormat": "table",
                         "select": [
                           [
@@ -641,7 +641,7 @@
                         "measurement": "ReverseProxyConnections",
                         "orderByTime": "ASC",
                         "policy": "default",
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"name\")\r\n  |> group(columns: [\"Name\"])\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])\r\n  |> count()",
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"name\")\r\n  |> group(columns: [\"Name\"])\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])\r\n  |> count()",
                         "resultFormat": "table",
                         "select": [
                           [
@@ -798,7 +798,7 @@
                         "measurement": "ReverseProxyConnections",
                         "orderByTime": "ASC",
                         "policy": "default",
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"ip\")\r\n  |> group(columns: [\"_count\"])\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])\r\n  |> count()",
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"ip\")\r\n  |> group(columns: [\"_count\"])\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])\r\n  |> count()",
                         "resultFormat": "time_series",
                         "select": [
                           [
@@ -920,7 +920,7 @@
                         "measurement": "ReverseProxyConnections",
                         "orderByTime": "ASC",
                         "policy": "default",
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"ip\")  \r\n  |> group(columns: [\"Ip\"])\r\n  |> count()\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n",
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"ip\")  \r\n  |> group(columns: [\"Ip\"])\r\n  |> count()\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n",
                         "resultFormat": "table",
                         "select": [
                           [
@@ -1098,7 +1098,7 @@
                         "measurement": "ReverseProxyConnections",
                         "orderByTime": "ASC",
                         "policy": "default",
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"domain\")\r\n  |> group(columns: [\"_measurement\", \"_field\", \"_time=1m\"])\r\n  |> aggregateWindow(every: 1m, fn: count, createEmpty: false)\r\n  |> yield(name: \"count\")",
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"domain\")\r\n  |> group(columns: [\"_measurement\", \"_field\", \"_time=1m\"])\r\n  |> aggregateWindow(every: 1m, fn: count, createEmpty: false)\r\n  |> yield(name: \"count\")",
                         "resultFormat": "time_series",
                         "select": [
                           [
@@ -1510,7 +1510,7 @@
                         "measurement": "ReverseProxyConnections",
                         "orderByTime": "ASC",
                         "policy": "default",
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"domain\")\r\n  |> group(columns: [\"Domain\"])\r\n  |> count()\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])\r\n",
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"domain\")\r\n  |> group(columns: [\"Domain\"])\r\n  |> count()\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])\r\n",
                         "resultFormat": "table",
                         "select": [
                           [
@@ -1663,7 +1663,7 @@
                         "measurement": "ReverseProxyConnections",
                         "orderByTime": "ASC",
                         "policy": "default",
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"domain\")\r\n  |> group(columns: [\"Domain\"])\r\n  |> count()\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])\r\n",
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"domain\")\r\n  |> group(columns: [\"Domain\"])\r\n  |> count()\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])\r\n",
                         "resultFormat": "table",
                         "select": [
                           [
@@ -1793,7 +1793,7 @@
                         "measurement": "ReverseProxyConnections",
                         "orderByTime": "ASC",
                         "policy": "default",
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"ip\")  \r\n  |> group(columns: [\"Longitude\",\"Latitude\",\"Ip\"])\r\n  |> count()\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])",
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"ip\")  \r\n  |> group(columns: [\"Longitude\",\"Latitude\",\"Ip\"])\r\n  |> count()\r\n  |> drop(columns: [\"host\", \"_field\", \"_measurement\", \"_start\", \"_stop\"])",
                         "resultFormat": "table",
                         "select": [
                           [
@@ -2504,7 +2504,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"asn\")\r\n  |> group(columns: [\"Asn\", \"Ip\"])\r\n  |> count()\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"asn\")\r\n  |> group(columns: [\"Asn\", \"Ip\"])\r\n  |> count()\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")"
                       },
                       "version": "v0"
                     },
@@ -2825,7 +2825,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"statuscode\")\r\n  |> duplicate(column: \"_value\", as: \"new_column\")\r\n  |> group(columns: [\"new_column\"])\r\n  |> count()\r\n  |> yield(name: \"alias\")"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"statuscode\")\r\n  |> duplicate(column: \"_value\", as: \"new_column\")\r\n  |> group(columns: [\"new_column\"])\r\n  |> count()\r\n  |> yield(name: \"alias\")"
                       },
                       "version": "v0"
                     },
@@ -2912,7 +2912,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"statuscode\")\r\n  |> filter(fn: (r) => r.Statuscode != \"200\")\r\n  |> duplicate(column: \"_value\", as: \"new_column\")\r\n  |> group(columns: [\"new_column\"])\r\n  |> count()\r\n  |> yield(name: \"alias\")\r\n"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"statuscode\")\r\n  |> filter(fn: (r) => r.Statuscode != \"200\")\r\n  |> duplicate(column: \"_value\", as: \"new_column\")\r\n  |> group(columns: [\"new_column\"])\r\n  |> count()\r\n  |> yield(name: \"alias\")\r\n"
                       },
                       "version": "v0"
                     },
@@ -3108,7 +3108,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => exists r.Agent and r.Agent != \"\")\r\n  |> group(columns: [\"Agent\"])\r\n  |> count(column: \"_value\")\r\n  |> keep(columns: [\"Agent\", \"_value\"])\r\n  |> rename(columns: {_value: \"count\"})\r\n"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => exists r.Agent and r.Agent != \"\")\r\n  |> group(columns: [\"Agent\"])\r\n  |> count(column: \"_value\")\r\n  |> keep(columns: [\"Agent\", \"_value\"])\r\n  |> rename(columns: {_value: \"count\"})\r\n"
                       },
                       "version": "v0"
                     },
@@ -3437,7 +3437,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"scheme\")\r\n  |> duplicate(column: \"_value\", as: \"new_column\")\r\n  |> group(columns: [\"new_column\"])\r\n  |> count()\r\n  |> yield(name: \"alias\")"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"scheme\")\r\n  |> duplicate(column: \"_value\", as: \"new_column\")\r\n  |> group(columns: [\"new_column\"])\r\n  |> count()\r\n  |> yield(name: \"alias\")"
                       },
                       "version": "v0"
                     },
@@ -3523,7 +3523,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"method\")\r\n  |> duplicate(column: \"_value\", as: \"new_column\")\r\n  |> group(columns: [\"new_column\"])\r\n  |> count()\r\n  |> yield(name: \"alias\")"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"method\")\r\n  |> duplicate(column: \"_value\", as: \"new_column\")\r\n  |> group(columns: [\"new_column\"])\r\n  |> count()\r\n  |> yield(name: \"alias\")"
                       },
                       "version": "v0"
                     },
@@ -3613,7 +3613,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\n  |> filter(fn: (r) => r[\"_field\"] == \"length\")\n  |> group(columns: [\"Domain\"])\n  |> sum()\n  |> group()\n  |> sort(desc: true)\n  |> limit(n: 10)\n  "
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\n  |> filter(fn: (r) => r[\"_field\"] == \"length\")\n  |> group(columns: [\"Domain\"])\n  |> sum()\n  |> group()\n  |> sort(desc: true)\n  |> limit(n: 10)\n  "
                       },
                       "version": "v0"
                     },
@@ -3854,7 +3854,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"asn\")\r\n  |> group(columns: [\"Asn\"])\r\n  |> count()\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"asn\")\r\n  |> group(columns: [\"Asn\"])\r\n  |> count()\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")"
                       },
                       "version": "v0"
                     },
@@ -3991,7 +3991,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\n  |> filter(fn: (r) => r[\"_field\"] == \"abuse_confidence_score\")\n  |> group(columns: [\"_measurement\", \"Abuse_Confidence_Score\"])\n  |> count()\n  |> drop(columns: [\"_start\", \"_stop\"])"
+                        "query": "from(bucket: v.defaultBucket)\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\n  |> filter(fn: (r) => r[\"_field\"] == \"abuse_confidence_score\")\n  |> group(columns: [\"_measurement\", \"Abuse_Confidence_Score\"])\n  |> count()\n  |> drop(columns: [\"_start\", \"_stop\"])"
                       },
                       "version": "v0"
                     },
@@ -4084,514 +4084,6 @@
           }
         }
       },
-      "panel-53": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "${DS_NPMGRAF}"
-                      },
-                      "group": "influxdb",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: \"[\" + r.Statuscode + \"] \" + r.Domain + \" → \" + r._value }))\r\n  |> group(columns: [\"full\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n"
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": [
-                {
-                  "kind": "reduce",
-                  "spec": {
-                    "id": "reduce",
-                    "options": {
-                      "labelsToFields": true,
-                      "reducers": [
-                        "lastNotNull"
-                      ]
-                    }
-                  }
-                },
-                {
-                  "kind": "sortBy",
-                  "spec": {
-                    "id": "sortBy",
-                    "options": {
-                      "fields": {},
-                      "sort": [
-                        {
-                          "desc": true,
-                          "field": "Last *"
-                        }
-                      ]
-                    }
-                  }
-                },
-                {
-                  "kind": "rowsToFields",
-                  "spec": {
-                    "id": "rowsToFields",
-                    "options": {
-                      "mappings": []
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "description": "",
-          "id": 53,
-          "links": [],
-          "title": "Uri - Top 25",
-          "vizConfig": {
-            "group": "bargauge",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "displayName": "${__field.labels.__values}",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
-                  }
-                },
-                "overrides": []
-              },
-              "options": {
-                "displayMode": "gradient",
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": false
-                },
-                "maxVizHeight": 300,
-                "minVizHeight": 16,
-                "minVizWidth": 8,
-                "namePlacement": "auto",
-                "orientation": "horizontal",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "/.*/",
-                  "limit": 25,
-                  "values": true
-                },
-                "showUnfilled": true,
-                "sizing": "auto",
-                "valueMode": "color"
-              }
-            },
-            "version": "12.3.0"
-          }
-        }
-      },
-      "panel-56": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "${DS_NPMGRAF}"
-                      },
-                      "group": "influxdb",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r.Statuscode == \"500\")\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: \"[\" + r.Statuscode + \"] \" + r.Domain + \" → \" + r._value }))\r\n  |> group(columns: [\"full\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n"
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": [
-                {
-                  "kind": "reduce",
-                  "spec": {
-                    "id": "reduce",
-                    "options": {
-                      "labelsToFields": true,
-                      "reducers": [
-                        "lastNotNull"
-                      ]
-                    }
-                  }
-                },
-                {
-                  "kind": "sortBy",
-                  "spec": {
-                    "id": "sortBy",
-                    "options": {
-                      "fields": {},
-                      "sort": [
-                        {
-                          "desc": true,
-                          "field": "Last *"
-                        }
-                      ]
-                    }
-                  }
-                },
-                {
-                  "kind": "rowsToFields",
-                  "spec": {
-                    "id": "rowsToFields",
-                    "options": {
-                      "mappings": []
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "description": "",
-          "id": 56,
-          "links": [],
-          "title": "Error 500 - Top 25",
-          "vizConfig": {
-            "group": "bargauge",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "displayName": "${__field.labels.__values}",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
-                  }
-                },
-                "overrides": []
-              },
-              "options": {
-                "displayMode": "gradient",
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": false
-                },
-                "maxVizHeight": 300,
-                "minVizHeight": 16,
-                "minVizWidth": 8,
-                "namePlacement": "auto",
-                "orientation": "horizontal",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "/.*/",
-                  "limit": 25,
-                  "values": true
-                },
-                "showUnfilled": true,
-                "sizing": "auto",
-                "valueMode": "color"
-              }
-            },
-            "version": "12.3.0"
-          }
-        }
-      },
-      "panel-57": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "${DS_NPMGRAF}"
-                      },
-                      "group": "influxdb",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r.Statuscode == \"404\")\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: \"[\" + r.Statuscode + \"] \" + r.Domain + \" → \" + r._value }))\r\n  |> group(columns: [\"full\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n"
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": [
-                {
-                  "kind": "reduce",
-                  "spec": {
-                    "id": "reduce",
-                    "options": {
-                      "labelsToFields": true,
-                      "reducers": [
-                        "lastNotNull"
-                      ]
-                    }
-                  }
-                },
-                {
-                  "kind": "sortBy",
-                  "spec": {
-                    "id": "sortBy",
-                    "options": {
-                      "fields": {},
-                      "sort": [
-                        {
-                          "desc": true,
-                          "field": "Last *"
-                        }
-                      ]
-                    }
-                  }
-                },
-                {
-                  "kind": "rowsToFields",
-                  "spec": {
-                    "id": "rowsToFields",
-                    "options": {
-                      "mappings": []
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "description": "",
-          "id": 57,
-          "links": [],
-          "title": "Error 404 - Top 25",
-          "vizConfig": {
-            "group": "bargauge",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "displayName": "${__field.labels.__values}",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
-                  }
-                },
-                "overrides": []
-              },
-              "options": {
-                "displayMode": "gradient",
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": false
-                },
-                "maxVizHeight": 300,
-                "minVizHeight": 16,
-                "minVizWidth": 8,
-                "namePlacement": "auto",
-                "orientation": "horizontal",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "/.*/",
-                  "limit": 25,
-                  "values": true
-                },
-                "showUnfilled": true,
-                "sizing": "auto",
-                "valueMode": "color"
-              }
-            },
-            "version": "12.3.0"
-          }
-        }
-      },
-      "panel-58": {
-        "kind": "Panel",
-        "spec": {
-          "data": {
-            "kind": "QueryGroup",
-            "spec": {
-              "queries": [
-                {
-                  "kind": "PanelQuery",
-                  "spec": {
-                    "hidden": false,
-                    "query": {
-                      "datasource": {
-                        "name": "${DS_NPMGRAF}"
-                      },
-                      "group": "influxdb",
-                      "kind": "DataQuery",
-                      "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"Redirections\" or r[\"_measurement\"] == \"ReverseProxyConnections\")\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r.Statuscode == \"401\" or r.Statuscode == \"403\")\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: \"[\" + r.Statuscode + \"] \" + r.Domain + \" → \" + r._value }))\r\n  |> group(columns: [\"full\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n"
-                      },
-                      "version": "v0"
-                    },
-                    "refId": "A"
-                  }
-                }
-              ],
-              "queryOptions": {},
-              "transformations": [
-                {
-                  "kind": "reduce",
-                  "spec": {
-                    "id": "reduce",
-                    "options": {
-                      "labelsToFields": true,
-                      "reducers": [
-                        "lastNotNull"
-                      ]
-                    }
-                  }
-                },
-                {
-                  "kind": "sortBy",
-                  "spec": {
-                    "id": "sortBy",
-                    "options": {
-                      "fields": {},
-                      "sort": [
-                        {
-                          "desc": true,
-                          "field": "Last *"
-                        }
-                      ]
-                    }
-                  }
-                },
-                {
-                  "kind": "rowsToFields",
-                  "spec": {
-                    "id": "rowsToFields",
-                    "options": {
-                      "mappings": []
-                    }
-                  }
-                }
-              ]
-            }
-          },
-          "description": "",
-          "id": 58,
-          "links": [],
-          "title": "Error 401, 403 - Top 25",
-          "vizConfig": {
-            "group": "bargauge",
-            "kind": "VizConfig",
-            "spec": {
-              "fieldConfig": {
-                "defaults": {
-                  "color": {
-                    "mode": "thresholds"
-                  },
-                  "displayName": "${__field.labels.__values}",
-                  "thresholds": {
-                    "mode": "absolute",
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": 0
-                      },
-                      {
-                        "color": "red",
-                        "value": 80
-                      }
-                    ]
-                  }
-                },
-                "overrides": []
-              },
-              "options": {
-                "displayMode": "gradient",
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": false
-                },
-                "maxVizHeight": 300,
-                "minVizHeight": 16,
-                "minVizWidth": 8,
-                "namePlacement": "auto",
-                "orientation": "horizontal",
-                "reduceOptions": {
-                  "calcs": [
-                    "lastNotNull"
-                  ],
-                  "fields": "/.*/",
-                  "limit": 25,
-                  "values": true
-                },
-                "showUnfilled": true,
-                "sizing": "auto",
-                "valueMode": "color"
-              }
-            },
-            "version": "12.3.0"
-          }
-        }
-      },
       "panel-59": {
         "kind": "Panel",
         "spec": {
@@ -4610,7 +4102,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: r.Domain + \" → \" + r._value }))\r\n  |> map(fn: (r) => ({ r with fulluri: r.Scheme + \"://\" + r.Domain + r._value }))\r\n  |> group(columns: [\"full\", \"Statuscode\",\"Ip\", \"fulluri\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n  |> map(fn: (r) => ({ r with open: \"Open\" }))\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: r.Domain + \" → \" + r._value }))\r\n  |> map(fn: (r) => ({ r with fulluri: r.Scheme + \"://\" + r.Domain + r._value }))\r\n  |> group(columns: [\"full\", \"Statuscode\",\"Ip\", \"fulluri\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n  |> map(fn: (r) => ({ r with open: \"Open\" }))\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n"
                       },
                       "version": "v0"
                     },
@@ -4859,7 +4351,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r.Statuscode != \"200\" and r.Statuscode != \"401\" and r.Statuscode != \"403\" and r.Statuscode != \"404\" and r.Statuscode != \"500\")\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: r.Domain + \" → \" + r._value }))\r\n  |> map(fn: (r) => ({ r with fulluri: r.Scheme + \"://\" + r.Domain + r._value }))\r\n  |> group(columns: [\"full\", \"Statuscode\", \"Ip\", \"fulluri\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n  |> map(fn: (r) => ({ r with open: \"Open\" }))\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r.Statuscode != \"200\" and r.Statuscode != \"401\" and r.Statuscode != \"403\" and r.Statuscode != \"404\" and r.Statuscode != \"499\" and r.Statuscode != \"500\")\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: r.Domain + \" → \" + r._value }))\r\n  |> map(fn: (r) => ({ r with fulluri: r.Scheme + \"://\" + r.Domain + r._value }))\r\n  |> group(columns: [\"full\", \"Statuscode\", \"Ip\", \"fulluri\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n  |> map(fn: (r) => ({ r with open: \"Open\" }))\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n"
                       },
                       "version": "v0"
                     },
@@ -4947,10 +4439,10 @@
               ]
             }
           },
-          "description": "Show all queries where the status code is not 200, 404 and 500.",
+          "description": "Show all queries where the status code is not 200, 404, 499 and 500.",
           "id": 60,
           "links": [],
-          "title": "Any Queries Except Status [200, 401, 403, 404, 500]",
+          "title": "Any Queries Except Status [200, 401, 403, 404, 499, 500]",
           "vizConfig": {
             "group": "table",
             "kind": "VizConfig",
@@ -5113,7 +4605,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r.Statuscode == \"404\")\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: r.Domain + \" → \" + r._value }))\r\n  |> map(fn: (r) => ({ r with fulluri: r.Scheme + \"://\" + r.Domain + r._value }))\r\n  |> group(columns: [\"full\", \"Ip\", \"fulluri\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n  |> map(fn: (r) => ({ r with open: \"Open\" }))\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r.Statuscode == \"404\")\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: r.Domain + \" → \" + r._value }))\r\n  |> map(fn: (r) => ({ r with fulluri: r.Scheme + \"://\" + r.Domain + r._value }))\r\n  |> group(columns: [\"full\", \"Ip\", \"fulluri\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n  |> map(fn: (r) => ({ r with open: \"Open\" }))\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n"
                       },
                       "version": "v0"
                     },
@@ -5357,7 +4849,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r.Statuscode == \"500\")\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: r.Domain + \" → \" + r._value }))\r\n  |> map(fn: (r) => ({ r with fulluri: r.Scheme + \"://\" + r.Domain + r._value }))\r\n  |> group(columns: [\"full\", \"Ip\", \"fulluri\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n  |> map(fn: (r) => ({ r with open: \"Open\" }))\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r.Statuscode == \"500\")\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: r.Domain + \" → \" + r._value }))\r\n  |> map(fn: (r) => ({ r with fulluri: r.Scheme + \"://\" + r.Domain + r._value }))\r\n  |> group(columns: [\"full\", \"Ip\", \"fulluri\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n  |> map(fn: (r) => ({ r with open: \"Open\" }))\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n"
                       },
                       "version": "v0"
                     },
@@ -5595,7 +5087,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r.Statuscode == \"401\" or r.Statuscode == \"403\")\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: r.Domain + \" → \" + r._value }))\r\n  |> map(fn: (r) => ({ r with fulluri: r.Scheme + \"://\" + r.Domain + r._value }))\r\n  |> group(columns: [\"full\", \"Statuscode\", \"Ip\", \"fulluri\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n  |> map(fn: (r) => ({ r with open: \"Open\" }))\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r.Statuscode == \"401\" or r.Statuscode == \"403\")\r\n  |> filter(fn: (r) => r._field == \"uri\")\r\n  |> map(fn: (r) => ({ r with full: r.Domain + \" → \" + r._value }))\r\n  |> map(fn: (r) => ({ r with fulluri: r.Scheme + \"://\" + r.Domain + r._value }))\r\n  |> group(columns: [\"full\", \"Statuscode\", \"Ip\", \"fulluri\"])\r\n  |> count()\r\n  |> rename(columns: {_value: \"total\"})\r\n  |> map(fn: (r) => ({ r with open: \"Open\" }))\r\n  |> drop(columns: [\"_start\", \"_stop\"])\r\n  |> yield(name: \"alias\")\r\n"
                       },
                       "version": "v0"
                     },
@@ -6128,7 +5620,7 @@
       "Python"
     ],
     "timeSettings": {
-      "autoRefresh": "5s",
+      "autoRefresh": "15s",
       "autoRefreshIntervals": [
         "5s",
         "10s",
@@ -6405,6 +5897,39 @@
           "regex": "",
           "skipUrlSync": false,
           "sort": "alphabeticalAsc"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "definition": "import \"influxdata/influxdb/schema\"\r\nschema.tagValues(\r\n    bucket: v.defaultBucket,\r\n    tag: \"Agent\"\r\n)",
+          "description": "",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Agent",
+          "multi": true,
+          "name": "agentquery",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "${DS_NPMGRAF}"
+            },
+            "group": "influxdb",
+            "kind": "DataQuery",
+            "spec": {
+              "query": "import \"influxdata/influxdb/schema\"\r\nschema.tagValues(\r\n    bucket: v.defaultBucket,\r\n    tag: \"Agent\"\r\n)"
+            },
+            "version": "v0"
+          },
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": "disabled"
         }
       }
     ]
