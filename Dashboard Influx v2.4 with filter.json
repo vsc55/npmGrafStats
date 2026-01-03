@@ -3,7 +3,7 @@
   "kind": "Dashboard",
   "metadata": {
     "name": "npmGraf_Python_lab",
-    "generation": 274,
+    "generation": 276,
     "creationTimestamp": "2025-12-07T19:03:18Z",
     "labels": {},
     "annotations": {}
@@ -3108,7 +3108,7 @@
                       "group": "influxdb",
                       "kind": "DataQuery",
                       "spec": {
-                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => exists r.Agent and r.Agent != \"\")\r\n  |> group(columns: [\"Agent\"])\r\n  |> count(column: \"_value\")\r\n  |> keep(columns: [\"Agent\", \"_value\"])\r\n  |> rename(columns: {_value: \"count\"})\r\n"
+                        "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] =~ /^${measurementquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Domain\"] =~ /^${domainquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Ip\"] =~ /^${ipquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Statuscode\"] =~ /^${statuscodequery:regex}$/)\r\n  |> filter(fn: (r) => r[\"Agent\"] =~ /^${agentquery:regex}$/)\r\n  |> filter(fn: (r) => r[\"_field\"] == \"agent\")\r\n  |> duplicate(column: \"_value\", as: \"new_column\")\r\n  |> group(columns: [\"new_column\"])\r\n  |> count()\r\n  |> yield(name: \"alias\")"
                       },
                       "version": "v0"
                     },
