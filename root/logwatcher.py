@@ -121,6 +121,23 @@ class LogWatcherManager:
                 while not self.stop_event.is_set():
                     line = f.readline()
                     if not line:
+                        # detected truncate or rotation
+                        try:
+                            current_pos = f.tell()
+                            f.seek(0, os.SEEK_END)
+                            end_pos = f.tell()
+                        except OSError as e:
+                            log.error("[%s] Stat error on %s: %s", task.description, path, e)
+                            continue
+
+                        if end_pos < current_pos:
+                            log.info(
+                                "[%s] Detected truncate/rotation of %s, seeking to end.",
+                                task.description,
+                                path
+                            )
+                            f.seek(0, os.SEEK_END)
+
                         time.sleep(TAIL_POLL_INTERVAL)
                         continue
 
@@ -185,9 +202,29 @@ class LogWatcherManager:
 
 
             # Validate if the item has the expected attributes
-            if not hasattr(item, "task") or not hasattr(item, "line"):
-                log.error("[%s] Invalid item in queue: %r %r", name, type(item), item)
-                # skip processing, the finally will do task_done()
+            # If not, log an error and continue to the next item, calling task_done()
+            if not isinstance(item, QueueItem):
+                log.error("[%s] Invalid item type in queue: %s", name, type(item).__name__)
+                continue
+
+            if item.task is None:
+                log.error("[%s] Queue item missing task", name)
+                continue
+
+            if not isinstance(item.line, str):
+                log.error(
+                    "[%s] Queue item line must be string, got: %s",
+                    name,
+                    type(item.line).__name__
+                )
+                continue
+
+            if len(item.line.strip()) == 0:
+                log.debug("[%s] Skipping empty line", name)
+                continue
+
+            if not hasattr(item.task, "processor") or not callable(item.task.processor):
+                log.error("[%s] Task missing processor", name)
                 continue
 
             try:
@@ -206,15 +243,24 @@ class LogWatcherManager:
                     except Exception as e:  # pylint: disable=broad-exception-caught
                         log.error("[Influx] Error writing record: %s", e)
 
-            # Used broad Exception to avoid that an error in a line
-            # stops the file following. This will log the error, the thread
-            # will end and in the next watch_logs iteration it will be restarted.
-            except Exception:  # pylint: disable=broad-exception-caught
+            except (ValueError, KeyError, AttributeError) as e:
+                # Error in data processing - log and continue
                 task_desc = getattr(getattr(item, "task", None), "description", "UNKNOWN_TASK")
                 line_text = getattr(item, "line", repr(item))
 
-                log.exception("[%s] Error processing line!", task_desc)
+                log.error("[%s] Data processing error: %s", task_desc, e)
                 log.error("Line content: %s", line_text)
+
+            except (MemoryError, SystemExit, KeyboardInterrupt):
+                # Error Critical errors - propagate to stop the application
+                raise
+
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Used broad Exception to avoid that an error in a line
+                # stops the file following. This will log the error, the thread
+                # will end and in the next watch_logs iteration it will be restarted.
+                task_desc = getattr(getattr(item, "task", None), "description", "UNKNOWN_TASK")
+                log.critical("[%s] Unexpected error: %s", task_desc, e, exc_info=True)
 
             finally:
                 self.queue.task_done()

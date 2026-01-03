@@ -15,6 +15,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, TypedDict
 
+import portalocker
 import requests
 
 from api.external.abuseipdb.cache_dict import CacheDict
@@ -22,12 +23,6 @@ from logger import LogLevel, get_logger
 
 from .exceptions import (AbuseIPDBConfigError, AbuseIPDBNetworkError,
                          AbuseIPDBRateLimitError, AbuseIPDBResponseError)
-
-if sys.platform != "win32":
-    import fcntl
-else:
-    fcntl = None
-
 
 log = get_logger(__name__)
 
@@ -359,12 +354,16 @@ class AbuseIPDB:
             try:
                 self.mkdir_cache_path()
 
-                with open(self.cache_path, 'w', encoding='utf-8') as cache_file:
-                    if fcntl:
-                        fcntl.flock(cache_file.fileno(), fcntl.LOCK_EX)
-                    json.dump({}, cache_file)
-                    if fcntl:
-                        fcntl.flock(cache_file.fileno(), fcntl.LOCK_UN)
+                with open(self.cache_path, 'a+', encoding='utf-8') as cache_file:
+                    portalocker.lock(cache_file, portalocker.LOCK_EX)
+                    try:
+                        cache_file.seek(0)
+                        cache_file.truncate(0)
+                        json.dump({}, cache_file)
+                        cache_file.flush()
+                        os.fsync(cache_file.fileno())
+                    finally:
+                        portalocker.unlock(cache_file)
 
             except Exception: # pylint: disable=broad-except
                 log.exception("Failed to clear AbuseIPDB cache at %s", self.cache_path)
@@ -387,11 +386,11 @@ class AbuseIPDB:
 
             try:
                 with open(self.cache_path, 'r', encoding='utf-8') as cache_file:
-                    if fcntl:
-                        fcntl.flock(cache_file.fileno(), fcntl.LOCK_SH)
-                    cache_data = json.load(cache_file)
-                    if fcntl:
-                        fcntl.flock(cache_file.fileno(), fcntl.LOCK_UN)
+                    portalocker.lock(cache_file, portalocker.LOCK_SH)
+                    try:
+                        cache_data = json.load(cache_file)
+                    finally:
+                        portalocker.unlock(cache_file)
 
                 log.debug("AbuseIPDB cache loaded from %s", self.cache_path)
                 self.cache_data = cache_data
@@ -445,12 +444,16 @@ class AbuseIPDB:
         try:
             self.mkdir_cache_path()
 
-            with open(self.cache_path, 'w', encoding='utf-8') as cache_file:
-                if fcntl:
-                    fcntl.flock(cache_file.fileno(), fcntl.LOCK_EX)
-                json.dump(cache_data, cache_file, indent=4)
-                if fcntl:
-                    fcntl.flock(cache_file.fileno(), fcntl.LOCK_UN)
+            with open(self.cache_path, 'a+', encoding='utf-8') as cache_file:
+                portalocker.lock(cache_file, portalocker.LOCK_EX)
+                try:
+                    cache_file.seek(0)
+                    cache_file.truncate(0)
+                    json.dump(cache_data, cache_file, indent=4, ensure_ascii=False)
+                    cache_file.flush()
+                    os.fsync(cache_file.fileno())
+                finally:
+                    portalocker.unlock(cache_file)
 
             log.debug("AbuseIPDB cache saved to %s", self.cache_path)
             self.set_cache_data_reset()

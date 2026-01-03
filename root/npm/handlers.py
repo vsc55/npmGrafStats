@@ -183,7 +183,11 @@ class HandlersNPM:
         try:
             ipaddress.ip_address(ip)
             with open(path, "r", encoding="utf-8") as f:
-                list_ips = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+                list_ips = [
+                    line.strip()
+                    for line in f
+                    if line.strip() and not line.lstrip().startswith("#")
+                ]
 
         except ValueError:
             log.error("Invalid IP address: %s", ip)

@@ -1,3 +1,4 @@
 requests
 geoip2
 influxdb-client
+portalocker

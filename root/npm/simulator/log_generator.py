@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from typing import List
 
+import portalocker
+
 from logger import get_logger
 
 log = get_logger(__name__)
@@ -370,7 +372,12 @@ class NginxLogGenerator:
         log.debug("[FakeLogGen] %s", line.strip())
 
         with open(self.output, "a", encoding="utf-8") as f:
-            f.write(line)
+            portalocker.lock(f, portalocker.LOCK_EX)
+            try:
+                f.write(line)
+                f.flush()
+            finally:
+                portalocker.unlock(f)
 
     # ---------- control ----------
 
