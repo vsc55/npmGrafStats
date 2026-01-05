@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import glob
 import os
-import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -18,7 +17,7 @@ from tasks import LogTask, TasksConfig
 log = get_logger(__name__)
 
 TAIL_POLL_INTERVAL = 0.2   # seconds between checks for new lines in follow_file
-SCAN_INTERVAL = 5.0        # seconds between scans for new log files in watch_logs
+SCAN_INTERVAL = 30.0       # seconds between scans for new log files in watch_logs
 
 
 # Autoscaling writer thread parameters
@@ -319,7 +318,7 @@ class LogWatcherManager:
 
                 if path in started:
                     if started[path].is_alive():
-                        log.debug("[%s] Already following: %s", desc, path)
+                        # log.debug("[%s] Already following: %s", desc, path)
                         continue
 
                     log.info("[%s] Restarting following: %s", desc, path)
