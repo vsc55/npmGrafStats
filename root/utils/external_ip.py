@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """ Utility module to get and cache the external IP address. """
 import time
+import urllib.error
 from typing import Optional
 from urllib.request import urlopen
 
 from logger import get_logger
 
 log = get_logger(__name__)
+
+URLS = [
+    "https://checkip.amazonaws.com",
+    "https://ifconfig.me/ip",
+    "https://api.ipify.org",
+]
 
 class ExternalIP:
     """Class to manage external IP detection with caching and TTL."""
@@ -16,14 +23,22 @@ class ExternalIP:
         self._ttl = ttl_seconds
 
     def _detect_external_ip(self) -> Optional[str]:
-        try:
-            with urlopen("https://ifconfig.me/ip", timeout=5) as response:
-                ip = response.read().decode("utf-8").strip()
-                log.debug("Detected external IP: %s", ip)
-                return ip or None
+        last_err: Exception | None = None
+        for url in URLS:
+            try:
+                with urlopen(url, timeout=5) as r:
+                    ip = r.read().decode("utf-8").strip()
+                    if ip:
+                        log.debug("Detected external IP from %s: %s", url, ip)
+                        return ip
 
-        except Exception as e:
-            raise ValueError("Error detecting external IP") from e
+            except urllib.error.URLError as e:
+                last_err = e
+                log.warning("External IP failed via %s: %r", url, e)
+
+        if last_err:
+            raise last_err
+        return None
 
     def _needs_refresh(self) -> bool:
         if self._ip is None or self._last_update is None:
