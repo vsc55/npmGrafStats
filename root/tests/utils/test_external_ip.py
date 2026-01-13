@@ -126,5 +126,5 @@ def test_external_ip_raises_on_error(monkeypatch):
 
     ext = ExternalIP()
 
-    with pytest.raises(ValueError, match="Error detecting external IP"):
+    with pytest.raises(TimeoutError, match="boom"):
         ext.get_ip(force=True)

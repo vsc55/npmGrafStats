@@ -15,6 +15,8 @@ URLS = [
     "https://api.ipify.org",
 ]
 
+TIMEOUT_URLOPEN = 5  # seconds
+
 class ExternalIP:
     """Class to manage external IP detection with caching and TTL."""
     def __init__(self, ttl_seconds: int = 3600) -> None:
@@ -26,11 +28,15 @@ class ExternalIP:
         last_err: Exception | None = None
         for url in URLS:
             try:
-                with urlopen(url, timeout=5) as r:
+                with urlopen(url, timeout=TIMEOUT_URLOPEN) as r:
                     ip = r.read().decode("utf-8").strip()
                     if ip:
                         log.debug("Detected external IP from %s: %s", url, ip)
                         return ip
+
+            except TimeoutError as e:
+                last_err = e
+                log.warning("External IP timeout (%s seconds) via %s", TIMEOUT_URLOPEN, url)
 
             except urllib.error.URLError as e:
                 last_err = e
