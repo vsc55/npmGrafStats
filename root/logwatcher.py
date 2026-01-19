@@ -117,30 +117,112 @@ class LogWatcherManager:
                 f.seek(0, os.SEEK_END)
                 log.info("[%s] Following: %s", task.description, path)
 
+                # Track inode of the path and the inode of the opened FD
+                try:
+                    path_ino = os.stat(path).st_ino
+                    fd_ino = os.fstat(f.fileno()).st_ino
+                except OSError as e:
+                    log.error("[%s] Stat error on %s: %s", task.description, path, e)
+                    return
+
                 while not self.stop_event.is_set():
                     line = f.readline()
-                    if not line:
-                        # detected truncate or rotation
-                        try:
-                            current_pos = f.tell()
-                            f.seek(0, os.SEEK_END)
-                            end_pos = f.tell()
-                        except OSError as e:
-                            log.error("[%s] Stat error on %s: %s", task.description, path, e)
-                            continue
+                    if line:
+                        self.queue.put(QueueItem(line=line, task=task))
+                        continue
 
-                        if end_pos < current_pos:
-                            log.info(
-                                "[%s] Detected truncate/rotation of %s, seeking to end.",
-                                task.description,
-                                path
-                            )
-                            f.seek(0, os.SEEK_END)
+                    # No new line: check rotation/truncate
+                    try:
+                        # Current read position in FD
+                        current_pos = f.tell()
+
+                        # Stats of the current path and current FD
+                        st_path = os.stat(path)
+                        st_fd = os.fstat(f.fileno())
+
+                    except FileNotFoundError:
+                        # Path vanished temporarily (during rotation)
+                        log.warning(
+                            "[%s] File disappeared (rotation in progress?): %s",
+                            task.description,
+                            path
+                        )
+                        time.sleep(TAIL_POLL_INTERVAL)
+                        continue
+
+                    except OSError as e:
+                        log.error("[%s] Stat error on %s: %s", task.description, path, e)
+                        time.sleep(TAIL_POLL_INTERVAL)
+                        continue
+
+
+                    # CASE 1: rename rotation (path inode != fd inode) OR path inode changed
+                    # Lossless: reopen and read from start of the new file (do NOT seek to end)
+                    if st_path.st_ino != st_fd.st_ino or st_path.st_ino != path_ino:
+                        log.info(
+                            "[%s] Detected rename rotation of %s (old_ino=%s new_ino=%s), reopening from start.",
+                            task.description,
+                            path,
+                            fd_ino,
+                            st_path.st_ino,
+                        )
+                        try:
+                            f.close()
+                        except Exception: # pylint: disable=broad-exception-caught
+                            pass
+
+                        time.sleep(0.2)
+
+                        try:
+                            f = open(path, "r", encoding="utf-8")
+                            # IMPORTANT: read from the beginning to avoid missing lines
+                            # written between create and our reopen
+                            path_ino = os.stat(path).st_ino
+                            fd_ino = os.fstat(f.fileno()).st_ino
+                        except Exception as e:  # pylint: disable=broad-exception-caught
+                            log.error("[%s] Error reopening %s: %s", task.description, path, e)
+                            time.sleep(1.0)
 
                         time.sleep(TAIL_POLL_INTERVAL)
                         continue
 
-                    self.queue.put(QueueItem(line=line, task=task))
+                    # CASE 2: copytruncate (same inode, but file size smaller than our position)
+                    # Lossless: seek to beginning (NOT to end)
+                    if st_path.st_size < current_pos:
+                        log.info(
+                            "[%s] Detected truncation of %s (size=%d < pos=%d), seeking to start.",
+                            task.description,
+                            path,
+                            st_path.st_size,
+                            current_pos,
+                        )
+                        f.seek(0)
+
+                    time.sleep(TAIL_POLL_INTERVAL)
+
+
+                    # if not line:
+                    #     # detected truncate or rotation
+                    #     try:
+                    #         current_pos = f.tell()
+                    #         f.seek(0, os.SEEK_END)
+                    #         end_pos = f.tell()
+                    #     except OSError as e:
+                    #         log.error("[%s] Stat error on %s: %s", task.description, path, e)
+                    #         continue
+
+                    #     if end_pos < current_pos:
+                    #         log.info(
+                    #             "[%s] Detected truncate/rotation of %s, seeking to end.",
+                    #             task.description,
+                    #             path
+                    #         )
+                    #         f.seek(0, os.SEEK_END)
+
+                    #     time.sleep(TAIL_POLL_INTERVAL)
+                    #     continue
+
+                    # self.queue.put(QueueItem(line=line, task=task))
 
         except FileNotFoundError:
             log.error("[%s] File disappeared: %s", task.description, path)
