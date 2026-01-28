@@ -352,7 +352,7 @@ class LogWatcherManager:
                 # Error Critical errors - propagate to stop the application
                 raise
 
-            except Exception:  # pylint: disable=broad-exception-caught
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 # Used broad Exception to avoid that an error in a line
                 # stops the file following. This will log the error, the thread
                 # will end and in the next watch_logs iteration it will be restarted.
