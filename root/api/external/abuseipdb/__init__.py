@@ -541,7 +541,10 @@ class AbuseIPDB:
             log.warning("AbuseIPDB cache entry for IP %s has no timestamp", ip_address)
             return None
 
-        assert self.cache_expire is not None
+        if self.cache_expire is None:
+            log.error("AbuseIPDB cache expire time is not configured")
+            return None
+            
         if current_time is None:
             current_time = time.time()
 

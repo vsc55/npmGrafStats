@@ -269,7 +269,14 @@ class HandlersNPM:
         """
         ip = record.get("ip", "")
         domain = record.get("domain", "")
-        length = int(record.get("length", 0))
+        
+        # Safe integer conversion with error handling
+        try:
+            length = int(record.get("length", 0))
+        except (ValueError, TypeError):
+            log.debug("Invalid length value in record, using 0")
+            length = 0
+            
         target = record.get("target", "")
         asn_flag = record.get("asn", False)
         status_code: str = record.get("status_code", "")
@@ -320,8 +327,10 @@ class HandlersNPM:
                     fields.update(geo_city_data)
 
                     # For tags, use string values for lat/lon
-                    tags["latitude"] = str(tags['latitude'])
-                    tags["longitude"] = str(tags['longitude'])
+                    if 'latitude' in tags:
+                        tags["latitude"] = str(tags['latitude'])
+                    if 'longitude' in tags:
+                        tags["longitude"] = str(tags['longitude'])
 
                 asn_data = self._get_geoip2asn(ip, asn_flag)
                 if asn_data:

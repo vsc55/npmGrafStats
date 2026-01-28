@@ -173,6 +173,7 @@ class LogWatcherManager:
 
                         time.sleep(0.2)
 
+                        f = None
                         try:
                             f = open(path, "r", encoding="utf-8")
                             # IMPORTANT: read from the beginning to avoid missing lines
@@ -181,7 +182,13 @@ class LogWatcherManager:
                             fd_ino = os.fstat(f.fileno()).st_ino
                         except Exception as e:  # pylint: disable=broad-exception-caught
                             log.error("[%s] Error reopening %s: %s", task.description, path, e)
+                            if f is not None:
+                                try:
+                                    f.close()
+                                except Exception: # pylint: disable=broad-exception-caught
+                                    pass
                             time.sleep(1.0)
+                            return
 
                         time.sleep(TAIL_POLL_INTERVAL)
                         continue
@@ -235,7 +242,9 @@ class LogWatcherManager:
 
         while not self.stop_event.is_set():
             q = self.queue.qsize()
-            n = len(self._writer_threads)
+            
+            with self._lock:
+                n = len(self._writer_threads)
 
             # scale up
             if q > HIGH_Q and n < MAX_WRITERS:
@@ -253,7 +262,8 @@ class LogWatcherManager:
                 # send a sentinel -> one writer will stop itself
                 self.queue.put(SENTINEL)
                 # optional: clean up dead threads
-                self._writer_threads = [t for t in self._writer_threads if t.is_alive()]
+                with self._lock:
+                    self._writer_threads = [t for t in self._writer_threads if t.is_alive()]
 
             time.sleep(1)
 
@@ -262,7 +272,8 @@ class LogWatcherManager:
         self._writer_id += 1
         t = threading.Thread(target=self._writer_loop, name=name, daemon=True)
         t.start()
-        self._writer_threads.append(t)
+        with self._lock:
+            self._writer_threads.append(t)
 
 
     def _writer_loop(self) -> None:
@@ -286,10 +297,12 @@ class LogWatcherManager:
             # If not, log an error and continue to the next item, calling task_done()
             if not isinstance(item, QueueItem):
                 log.error("[%s] Invalid item type in queue: %s", name, type(item).__name__)
+                self.queue.task_done()
                 continue
 
             if item.task is None:
                 log.error("[%s] Queue item missing task", name)
+                self.queue.task_done()
                 continue
 
             if not isinstance(item.line, str):
@@ -298,14 +311,17 @@ class LogWatcherManager:
                     name,
                     type(item.line).__name__
                 )
+                self.queue.task_done()
                 continue
 
             if len(item.line.strip()) == 0:
                 log.debug("[%s] Skipping empty line", name)
+                self.queue.task_done()
                 continue
 
             if not hasattr(item.task, "processor") or not callable(item.task.processor):
                 log.error("[%s] Task missing processor", name)
+                self.queue.task_done()
                 continue
 
             try:
