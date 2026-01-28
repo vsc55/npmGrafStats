@@ -173,21 +173,43 @@ class LogWatcherManager:
 
                         time.sleep(0.2)
 
+                        # Retry reopening the file with a timeout
                         f = None
-                        try:
-                            f = open(path, "r", encoding="utf-8")
-                            # IMPORTANT: read from the beginning to avoid missing lines
-                            # written between create and our reopen
-                            path_ino = os.stat(path).st_ino
-                            fd_ino = os.fstat(f.fileno()).st_ino
-                        except Exception as e:  # pylint: disable=broad-exception-caught
-                            log.error("[%s] Error reopening %s: %s", task.description, path, e)
-                            if f is not None:
-                                try:
-                                    f.close()
-                                except Exception: # pylint: disable=broad-exception-caught
-                                    pass
-                            time.sleep(1.0)
+                        reopen_attempts = 0
+                        max_reopen_attempts = 10
+                        while f is None and not self.stop_event.is_set() and reopen_attempts < max_reopen_attempts:
+                            try:
+                                f = open(path, "r", encoding="utf-8")
+                                # IMPORTANT: read from the beginning to avoid missing lines
+                                # written between create and our reopen
+                                path_ino = os.stat(path).st_ino
+                                fd_ino = os.fstat(f.fileno()).st_ino
+                                log.info("[%s] Successfully reopened %s", task.description, path)
+                            except Exception as e:  # pylint: disable=broad-exception-caught
+                                reopen_attempts += 1
+                                log.warning(
+                                    "[%s] Error reopening %s (attempt %d/%d): %s",
+                                    task.description,
+                                    path,
+                                    reopen_attempts,
+                                    max_reopen_attempts,
+                                    e
+                                )
+                                if f is not None:
+                                    try:
+                                        f.close()
+                                    except Exception: # pylint: disable=broad-exception-caught
+                                        pass
+                                    f = None
+                                time.sleep(1.0)
+
+                        if f is None:
+                            log.error(
+                                "[%s] Failed to reopen %s after %d attempts, stopping file watcher",
+                                task.description,
+                                path,
+                                max_reopen_attempts
+                            )
                             return
 
                         time.sleep(TAIL_POLL_INTERVAL)
