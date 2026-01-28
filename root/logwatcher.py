@@ -177,7 +177,7 @@ class LogWatcherManager:
                         f = None
                         reopen_attempts = 0
                         max_reopen_attempts = 10
-                        while f is None and not self.stop_event.is_set() and reopen_attempts < max_reopen_attempts:
+                        while not self.stop_event.is_set() and reopen_attempts < max_reopen_attempts:
                             try:
                                 f = open(path, "r", encoding="utf-8")
                                 # IMPORTANT: read from the beginning to avoid missing lines
@@ -185,6 +185,7 @@ class LogWatcherManager:
                                 path_ino = os.stat(path).st_ino
                                 fd_ino = os.fstat(f.fileno()).st_ino
                                 log.info("[%s] Successfully reopened %s", task.description, path)
+                                break  # Success - exit retry loop
                             except Exception as e:  # pylint: disable=broad-exception-caught
                                 reopen_attempts += 1
                                 log.warning(
@@ -201,7 +202,8 @@ class LogWatcherManager:
                                     except Exception: # pylint: disable=broad-exception-caught
                                         pass
                                     f = None
-                                time.sleep(1.0)
+                                if reopen_attempts < max_reopen_attempts:
+                                    time.sleep(1.0)
 
                         if f is None:
                             log.error(
