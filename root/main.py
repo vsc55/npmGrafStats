@@ -23,11 +23,14 @@ log = get_logger(__name__)
 
 signal_event = threading.Event()
 
+
 def _handle_sigterm(_signum, _frame):
     """Handle SIGTERM signal to initiate graceful shutdown."""
     signal_event.set()
 
+
 signal.signal(signal.SIGTERM, _handle_sigterm)
+
 
 def test_connection(cli_influx: InfluxClient) -> bool:
     """Test connection to InfluxDB."""
@@ -60,7 +63,6 @@ def run() -> int:
     """Main function to start log watchers based on configuration."""
     log.info("Starting...")
 
-
     # -- Initialize AbuseIPDB Cache
     log.info("Start Cache for AbuseIPDB...")
     if get_abuse_instance(cfg.api_abuseip_key) is not None:
@@ -71,13 +73,12 @@ def run() -> int:
     else:
         log.warning("AbuseIPDB Cache could not be started.")
 
-
     # -- Initialize Fake InfluxDB Server and/or Fake Log Clients
     fake_server_enable = env_bool("FAKE_SERVER", False)
     fake_client_enable = env_bool("FAKE_CLIENT", False)
 
-    fake_server : FakeInfluxServer | None = None
-    fake_clients : NginxLogGenerator | None = None
+    fake_server: FakeInfluxServer | None = None
+    fake_clients: NginxLogGenerator | None = None
 
     url = cfg.influxdb['url']
     if url == "fake" or fake_server_enable:
@@ -93,10 +94,9 @@ def run() -> int:
 
         fake_clients = NginxLogGenerator()
         fake_clients.output = fake_client_file
-        fake_clients.base_interval = fake_client_interval # seconds
+        fake_clients.base_interval = fake_client_interval  # seconds
         fake_clients.min_batch = fake_client_min_batch
         fake_clients.max_batch = fake_client_max_batch
-
 
     # -- Initialize InfluxDB Client
     cli_influx = InfluxClient.create(
@@ -117,13 +117,11 @@ def run() -> int:
         log.exception("InfluxDB connection error")
         return 1
 
-
     # -- Initialize Log Watcher Tasks
     tasks = TasksConfig(config=cfg, auto_discover=True)
     if tasks.count == 0:
         log.info("No log tasks configured, exiting...")
         return 0
-
 
     # -- Start Log Watcher Manager
     manager = LogWatcherManager(tasks, cli_influx)
@@ -134,7 +132,6 @@ def run() -> int:
     else:
         log.info("No log watcher threads started.")
         return 0
-
 
     # -- Start Fake Log Clients
     if fake_clients is not None:
@@ -173,6 +170,7 @@ def run() -> int:
             log.info("[STOP] Fake InfluxDB server stopped.")
 
     return exit_code
+
 
 if __name__ == "__main__":
     # pylint: disable=line-too-long
