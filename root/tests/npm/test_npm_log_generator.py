@@ -61,7 +61,7 @@ def test_gen_line_499_format(tmp_path: Path):
     gen._choose_path_for_host = lambda host: "/js/test.js"
     gen._get_client_ip = lambda: "192.0.2.180"
     gen._choose_referrer = lambda host: "https://ref.example/"
-    gen._choose_upstream = lambda host, ip_ratio=0.2: "srv.example.com"
+    gen._choose_upstream = lambda host: "srv.example.com"
 
     line = gen._gen_line()
 
