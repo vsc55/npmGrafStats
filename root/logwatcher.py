@@ -23,8 +23,8 @@ SCAN_INTERVAL = 30.0       # seconds between scans for new log files in watch_lo
 # Autoscaling writer thread parameters
 MIN_WRITERS = 4
 MAX_WRITERS = 48
-HIGH_Q = 100      # if exceeds this, add more writer threads
-LOW_Q  = 100      # if below this, remove writer threads
+HIGH_Q = 100  # if exceeds this, add more writer threads
+LOW_Q = 100  # if below this, remove writer threads
 SENTINEL = object()  # marker to signal writer threads to stop
 
 
@@ -33,6 +33,7 @@ class QueueItem:
     """Item in the log processing queue."""
     line: Optional[str] = None
     task: Optional[LogTask] = None
+
 
 class LogWatcherManager:
     """Manages multiple log watching tasks and a single InfluxDB writer."""
@@ -79,8 +80,7 @@ class LogWatcherManager:
             )
             t.start()
             self.threads.append(t)
-            time.sleep(0.5) # stagger thread starts
-
+            time.sleep(0.5)  # stagger thread starts
 
     def stop(self) -> None:
         """Signal all threads to stop and join them."""
@@ -99,7 +99,6 @@ class LogWatcherManager:
         log.info("[STOP] All threads stopped.")
         self._running = False
 
-
     def started_paths_snapshot(self) -> dict[str, list[str]]:
         """Return a snapshot of currently started log paths per task description."""
         with self._lock:
@@ -108,8 +107,8 @@ class LogWatcherManager:
                 for desc, paths in self._started.items()
             }
 
-
     # --- Internal methods ---
+
     def _follow_file(self, path: str, task: LogTask) -> None:
         """Follow a log file and process new lines as they are added."""
         try:
@@ -155,7 +154,6 @@ class LogWatcherManager:
                         time.sleep(TAIL_POLL_INTERVAL)
                         continue
 
-
                     # CASE 1: rename rotation (path inode != fd inode) OR path inode changed
                     # Lossless: reopen and read from start of the new file (do NOT seek to end)
                     if st_path.st_ino != st_fd.st_ino or st_path.st_ino != path_ino:
@@ -168,7 +166,7 @@ class LogWatcherManager:
                         )
                         try:
                             f.close()
-                        except Exception: # pylint: disable=broad-exception-caught
+                        except Exception:  # pylint: disable=broad-exception-caught
                             pass
 
                         time.sleep(0.2)
@@ -199,7 +197,7 @@ class LogWatcherManager:
                                 if f is not None:
                                     try:
                                         f.close()
-                                    except Exception: # pylint: disable=broad-exception-caught
+                                    except Exception:  # pylint: disable=broad-exception-caught
                                         pass
                                     f = None
                                 if reopen_attempts < max_reopen_attempts:
@@ -230,7 +228,6 @@ class LogWatcherManager:
                         f.seek(0)
 
                     time.sleep(TAIL_POLL_INTERVAL)
-
 
                     # if not line:
                     #     # detected truncate or rotation
@@ -266,7 +263,7 @@ class LogWatcherManager:
 
         while not self.stop_event.is_set():
             q = self.queue.qsize()
-            
+
             with self._lock:
                 n = len(self._writer_threads)
 
@@ -299,7 +296,6 @@ class LogWatcherManager:
         with self._lock:
             self._writer_threads.append(t)
 
-
     def _writer_loop(self) -> None:
         """Single writer thread that consumes records from the queue and writes to InfluxDB."""
         name = threading.current_thread().name
@@ -315,7 +311,6 @@ class LogWatcherManager:
                 self.queue.task_done()
                 log.info("[%s] Writer thread stopping on sentinel.", name)
                 break
-
 
             # Validate if the item has the expected attributes
             # If not, log an error and continue to the next item, calling task_done()
@@ -386,12 +381,10 @@ class LogWatcherManager:
             finally:
                 self.queue.task_done()
 
-
     def _get_started_dict_for_task(self, description: str) -> dict[str, threading.Thread]:
         """Get or create the started dict for a given task description."""
         with self._lock:
             return self._started.setdefault(description, {})
-
 
     def _del_started_for_path(self, desc: str, path: str) -> None:
         """Delete the started entry for a given path."""
@@ -401,7 +394,6 @@ class LogWatcherManager:
                 del self._started[desc][path]
             except KeyError:
                 pass
-
 
     def _watch_logs(self, task: LogTask) -> None:
         """Watch log files matching the pattern of a task and start following new ones."""
@@ -463,7 +455,6 @@ class LogWatcherManager:
 
         self._stop_all_started(desc)
 
-
     def _stop_all_started(self, description: str) -> None:
         """Kill all watch_logs threads for a given task description."""
         started = self._get_started_dict_for_task(description)
@@ -474,7 +465,6 @@ class LogWatcherManager:
                 th.join(timeout=5.0)
 
             log.info("[STOP][%s] Follow thread finished for: %s (alive=%s)", description, path, th.is_alive())
-            
 
         # Clear started dict for this task
         with self._lock:
