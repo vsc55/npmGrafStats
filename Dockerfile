@@ -1,5 +1,5 @@
 # Stage 1: Build environment
-FROM python:3.14-slim AS builder
+FROM python:3.15-rc-alpine3.22 AS builder
 
 LABEL maintainer="npmgrafstats@cerebelum.net"
 
@@ -14,7 +14,7 @@ COPY ./root/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Stage 2: Runtime environment
-FROM python:3.14-slim
+FROM python:3.15-rc-alpine3.22
 
 # Python environment variables
 ENV PYTHONUNBUFFERED=1
