@@ -21,16 +21,16 @@ class NginxLogGenerator:
     """
 
     HOSTS = [
-        "www.ejemplo.com",
-        "tienda.ejemplo.com",
-        "api.ejemplo.com",
-        "static.ejemplo.com",
-        "intranet.local",
-        "admin.ejemplo.com",
-        "blog.ejemplo.com",
-        "foro.ejemplo.com",
-        "media.ejemplo.com",
-        "dev.ejemplo.com"
+        "www.example.com",
+        "store.example.com",
+        "api.example.com",
+        "static.example.test",
+        "example.local",
+        "admin.example.com",
+        "blog.example.com",
+        "mov.example.com",
+        "media.example.com",
+        "dev.example.com"
     ]
 
     USER_AGENTS = [
@@ -52,8 +52,8 @@ class NginxLogGenerator:
         "https://www.bing.com/",
         "https://www.facebook.com/",
         "https://twitter.com/",
-        "https://www.ejemplo.com/",
-        "https://tienda.ejemplo.com/productos",
+        "https://www.example.com/",
+        "https://store.example.com/productos",
     ]
 
     PRIVATE_IP_RANGES = [
@@ -189,7 +189,7 @@ class NginxLogGenerator:
             "/login",
             "/logout",
             "/signup",
-            "/buscar",
+            "/find",
         ]
 
         tienda = [

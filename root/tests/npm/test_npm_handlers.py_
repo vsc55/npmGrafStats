@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """ Test cases for log handlers. """
 from unittest.mock import MagicMock
+
 from config import cfg
 from npm.handlers import handle_line
+
 
 def test_handle_line_proxy_normal():
     """ Test handle_line for reverse proxy in normal mode. """
 
     # simulamos un log típico de proxy
-    line = '[16/Nov/2025:13:27:05 +0100] - 200 200 - GET http www.ejemplo.com "/buscar" [Client 192.168.58.47] [Length 6732] [Gzip -] [Sent-to srv.ejemplo.com] "Mozilla/5.0 (X11; Linux x86_64)" "-"'
+    line = '[16/Nov/2025:13:27:05 +0100] - 200 200 - GET http www.example.com "/find" [Client 192.168.58.47] [Length 6732] [Gzip -] [Sent-to srv.example.com] "Mozilla/5.0 (X11; Linux x86_64)" "-"'
 
     # La función ahora devuelve una lista de InfluxRecord en lugar de escribir directamente
     records = handle_line(line, "proxy", cfg)

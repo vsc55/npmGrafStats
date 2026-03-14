@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from queue import Empty, Queue
 from typing import Optional
 
+from api.external.abuseipdb import AbuseIPDBRateLimitError
 from connector.influx import InfluxClient, InfluxRecord
 from logger import get_logger
 from tasks import LogTask, TasksConfig
@@ -370,6 +371,9 @@ class LogWatcherManager:
             except (MemoryError, SystemExit, KeyboardInterrupt):
                 # Error Critical errors - propagate to stop the application
                 raise
+
+            except AbuseIPDBRateLimitError as e:
+                log.warning("[%s] AbuseIPDB rate limit hit: %s", item.task.description, e)
 
             except Exception as e:  # pylint: disable=broad-exception-caught
                 # Used broad Exception to avoid that an error in a line
