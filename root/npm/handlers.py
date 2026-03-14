@@ -269,14 +269,14 @@ class HandlersNPM:
         """
         ip = record.get("ip", "")
         domain = record.get("domain", "")
-        
+
         # Safe integer conversion with error handling
         try:
             length = int(record.get("length", 0))
         except (ValueError, TypeError):
             log.debug("Invalid length value in record, using 0")
             length = 0
-            
+
         target = record.get("target", "")
         asn_flag = record.get("asn", False)
         status_code: str = record.get("status_code", "")

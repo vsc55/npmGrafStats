@@ -209,7 +209,8 @@ class GlobalConfig:
             " - monitor_file_path=%s (exists=%s)\n"
             " - influxdb=%s\n"
             " - influxdb_retry_connect=%s\n"
-            " - influxdb_retry_delay=%s\n\n",
+            " - influxdb_retry_delay=%s\n"
+            " - api_abuseip_key=%s\n\n",
             newcfg.proxy_logs,
             newcfg.redirect_logs,
             newcfg.public_logs,
@@ -223,7 +224,8 @@ class GlobalConfig:
             newcfg.monitor_file_exists,
             "newcfg.influxdb",
             newcfg.influxdb_retry_connect,
-            newcfg.influxdb_retry_delay
+            newcfg.influxdb_retry_delay,
+            ("<set>" if newcfg.api_abuseip_key else "<not set>")
         )
 
         newcfg.lock()
