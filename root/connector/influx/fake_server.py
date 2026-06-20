@@ -31,7 +31,10 @@ class FakeInfluxHandler(BaseHTTPRequestHandler):
         """Handle POST requests."""
         if self.path.startswith("/api/v2/write"):
             # ready and discard the body
-            length = int(self.headers.get("Content-Length", 0))
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+            except (TypeError, ValueError):
+                length = 0
             _ = self.rfile.read(length)
             self.send_response(204)
             self.end_headers()

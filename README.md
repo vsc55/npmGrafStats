@@ -90,7 +90,7 @@ Each log entry produces a structured record containing:
   - Coordinates
   - City
 - **GeoIP data** (from `GeoLite2-ASN.mmdb` if enabled):
-  - Organizatio
+  - Organization
 
 > Note: GeoIP requires a valid `GeoLite2-City.mmdb` and `GeoLite2-ASN.mmdb` files and configured paths.
 
@@ -164,7 +164,7 @@ All configuration is done through environment variables:
 | `ABUSEIP_CACHE_FILE` | Path to AbuseIPDB cache file (default: `/data/abuseipdb_cache.json`) |
 | `GEO_ASN_DB_PATH` | Path to `GeoLite2-ASN.mmdb` (default `/geolite/GeoLite2-ASN.mmdb`) |
 | `GEO_CITY_DB_PATH` | Path to `GeoLite2-City.mmdb` (default `/geolite/GeoLite2-City.mmdb`) |
-| `MONITORING_FILE_PATH` | File Monotoring IP's, (default `/data/monitoringips.txt`) |
+| `MONITORING_FILE_PATH` | File with monitoring IPs (default `/data/monitoringips.txt`) |
 | `NPM_LOGS_PATH` | Path to Nginx Proxy Manager logs (default `/logs`) |
 | `PROXY_LOGS` | Enable proxy logs (default `true`) |
 | `REDIRECT_LOGS` | Enable redirection logs (default `true`) |
@@ -184,9 +184,15 @@ All configuration is done through environment variables:
 
 The exported data structure is designed to remain compatible with the original npmGrafStats dashboards:
 
-- Measurement name: `npm_requests`,
-- Tags: `Ip`, `Target`, `Domain`, `Statuscode`, `Method`, `Scheme`, `Agent`, `Key`, `City`, `State`, `Name`, `Latitude`, `Longitude`, `Asn`, `Abuse_Confidence_Score`, `Abuse_Total_Reports`
-- Fields: `ip`, `target`, `domain`, `statuscode`, `method`, `scheme`, `agent`, `uri`, `length`, `metric`, `key`, `city`, `state`, `name`,  `latitude`, `longitude`,  `asn`, `abuse_confidence_score`, `abuse_total_reports`
+- Measurements (one per traffic class):
+  - `ReverseProxyConnections` — public traffic from `proxy-host-*` logs
+  - `Redirections` — public traffic from `redirection-host-*` logs
+  - `MonitoringRProxyIPs` — monitoring-service IPs
+  - `InternalRProxyIPs` — internal/private IPs (base fields only, no geo/asn/abuse)
+- Tags (`Title_Case`): `Ip`, `Target`, `Domain`, `Statuscode`, `Upstream_Statuscode`, `Upstream_Cache_Statuscode`, `Method`, `Scheme`, `Agent` — plus, on enriched records: `Key`, `City`, `State`, `Name`, `Latitude`, `Longitude`, `Asn`, `Abuse_Confidence_Score`, `Abuse_Total_Reports`
+- Fields (lowercase): `ip`, `target`, `domain`, `statuscode`, `upstream_statuscode`, `upstream_cache_statuscode`, `method`, `scheme`, `agent`, `uri`, `length`, `metric` — plus, on enriched records: `key`, `city`, `state`, `name`, `latitude`, `longitude`, `asn`, `abuse_confidence_score`, `abuse_total_reports`
+
+> The country name is the `Name` tag (there is no `country` tag), and there is no `target_ip`/`abuse_score` field. See [docs/LOG_CONFIGURATION_EN.md](root/docs/LOG_CONFIGURATION_EN.md) for the full schema.
 
 > ---
 > ⚠️ **Important notice**

@@ -103,10 +103,10 @@ class GlobalConfig:
     # -------- InfluxDB connection settings --------
     influxdb: dict = field(
         default_factory=lambda: {
-            "url": str,
-            "bucket": str,
-            "org": str,
-            "token": str,
+            "url": "",
+            "bucket": "",
+            "org": "",
+            "token": "",
         }
     )
 
@@ -152,13 +152,15 @@ class GlobalConfig:
     # ------- Locking mechanism to prevent further modifications --------
     _locked: bool = field(init=False, repr=False, default=False)
     def __setattr__(self, name, value):
-        if hasattr(self, "_locked") and self._locked:
+        # `_locked` itself must always be settable, otherwise unlock() could
+        # never clear the flag (it assigns through __setattr__).
+        if name != "_locked" and getattr(self, "_locked", False):
             raise AttributeError("GlobalConfig is locked and cannot be modified")
         super().__setattr__(name, value)
 
     def lock(self):
         """Lock the config after initialization."""
-        # self._locked = True
+        self._locked = True
 
     def unlock(self):
         """Unlock the config for modifications."""

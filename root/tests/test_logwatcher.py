@@ -21,6 +21,10 @@ class FakeInfluxClient:
         """Simulate writing a point to InfluxDB by storing it in a list."""
         self.records.append(rec)
 
+    def write_points(self, recs):
+        """Simulate a batched write by storing all records in order."""
+        self.records.extend(recs)
+
 
 def test_writer_loop_writes_records_to_influx():
     """Test that the writer loop correctly writes records to InfluxDB."""

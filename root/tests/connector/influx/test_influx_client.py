@@ -298,6 +298,76 @@ def test_write_point_happy_path_builds_point_and_calls_write(patched_influx):
     assert point.timestamp == "2025-11-15T10:20:30Z"
 
 
+def test_write_points_batches_all_in_one_write(patched_influx):
+    """ write_points should send every valid record in a single write() call. """
+    client = InfluxClient.create(
+        url="http://localhost:8086",
+        org="my-org",
+        token="my-token",
+        bucket="my-bucket",
+    )
+    client._ensure_client() # pylint: disable=protected-access
+    dummy_write_api: DummyWriteApi = client._write_api # type: ignore[assignment]
+
+    recs = [
+        InfluxRecord(measurement="m", tags={"a": "1"}, fields={"v": 1}),
+        InfluxRecord(measurement="m", tags={"a": "2"}, fields={"v": 2}),
+        InfluxRecord(measurement="", tags={}, fields={"v": 3}),   # skipped (no measurement)
+    ]
+
+    client.write_points(recs)
+
+    # Exactly one write, with a list of the two valid points.
+    assert len(dummy_write_api.writes) == 1
+    _bucket, _org, record = dummy_write_api.writes[0]
+    assert isinstance(record, list)
+    assert len(record) == 2
+    assert {p.tags["a"] for p in record} == {"1", "2"}
+
+
+def test_write_points_poison_pill_fallback(monkeypatch, patched_influx):
+    """
+    If the batch write fails, write_points must retry point by point and drop
+    only the failing one, salvaging the rest.
+    """
+    client = InfluxClient.create(
+        url="http://localhost:8086",
+        org="my-org",
+        token="my-token",
+        bucket="my-bucket",
+    )
+    client._ensure_client() # pylint: disable=protected-access
+    dummy_write_api: DummyWriteApi = client._write_api # type: ignore[assignment]
+
+    calls = {"batch": 0, "single": 0}
+
+    def flaky_write(bucket, org, record):
+        if isinstance(record, list):
+            calls["batch"] += 1
+            raise RuntimeError("batch rejected")
+        calls["single"] += 1
+        # The second point is the poison pill.
+        if record.tags.get("a") == "2":
+            raise RuntimeError("bad point")
+        dummy_write_api.writes.append((bucket, org, record))
+
+    monkeypatch.setattr(dummy_write_api, "write", flaky_write)
+
+    recs = [
+        InfluxRecord(measurement="m", tags={"a": "1"}, fields={"v": 1}),
+        InfluxRecord(measurement="m", tags={"a": "2"}, fields={"v": 2}),  # poison
+        InfluxRecord(measurement="m", tags={"a": "3"}, fields={"v": 3}),
+    ]
+
+    # Must not raise even though the batch and one point fail.
+    client.write_points(recs)
+
+    assert calls["batch"] == 1          # one failed batch attempt
+    assert calls["single"] == 3         # then each point individually
+    # The two good points were salvaged; the poison one was dropped.
+    assert {p.tags["a"] for _b, _o, p in dummy_write_api.writes} == {"1", "3"}
+
+
 def test_close_closes_underlying_client(patched_influx):
     """ Test that close() closes the underlying client and resets attributes. """
     client = InfluxClient.create(

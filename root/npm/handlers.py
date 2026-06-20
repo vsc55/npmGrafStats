@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import ipaddress
+import os
 import re
+import threading
 from dataclasses import dataclass
 from typing import Any, Optional, TypedDict
 
@@ -18,6 +20,44 @@ from utils import Regex, TypeRegex, format_time, is_ip_in_range, parse_float
 from .types import LogKind, TypeSendRecord
 
 log = get_logger(__name__)
+
+# Cache of parsed monitoring IP lists keyed by file path. The file is re-read
+# only when its modification time changes, so we avoid opening/parsing it on
+# every processed log line.
+_monitor_cache: dict[str, tuple[float, list[str]]] = {}
+_monitor_cache_lock = threading.Lock()
+
+
+def _load_monitor_list(path: str) -> list[str]:
+    """Return the monitoring IP entries for ``path``, cached by mtime."""
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        log.error("Monitoring file not found: %s", path)
+        return []
+
+    cached = _monitor_cache.get(path)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+
+    with _monitor_cache_lock:
+        cached = _monitor_cache.get(path)
+        if cached is not None and cached[0] == mtime:
+            return cached[1]
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                list_ips = [
+                    line.strip()
+                    for line in f
+                    if line.strip() and not line.lstrip().startswith("#")
+                ]
+        except OSError:
+            log.error("Monitoring file not found: %s", path)
+            return []
+
+        _monitor_cache[path] = (mtime, list_ips)
+        return list_ips
 
 
 @dataclass
@@ -61,7 +101,11 @@ class HandlersNPM:
         """ Normalizes NGINX log fields, converting None or '-' to default integer. """
         if value in (None, "-"):
             return default
-        return int(value)
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            log.debug("Invalid integer value in log field: %r, using default", value)
+            return default
 
     def normalize_nginx_time(self, value: str | None) -> str:
         """ Normalizes NGINX log time fields to ISO 8601 format or empty string. """
@@ -74,10 +118,28 @@ class HandlersNPM:
         if value in (None, "-"):
             return default
 
-        pattern = Regex.compile_type(TypeRegex.IP)
-        matches = [m.group(0) for m in pattern.finditer(value)]
+        value = value.strip()
 
-        return matches[0] if len(matches) > 0 else None
+        # Fast path: the whole token is already a valid IP. This is the normal
+        # NPM case and is required for IPv6, which the regex below would
+        # otherwise truncate (e.g. "2001:db8::1" -> "2001:db8::").
+        try:
+            ipaddress.ip_address(value)
+            return value
+        except ValueError:
+            pass
+
+        # Fallback: scan for the first substring that parses as a valid IP.
+        pattern = Regex.compile_type(TypeRegex.IP)
+        for m in pattern.finditer(value):
+            candidate = m.group(0)
+            try:
+                ipaddress.ip_address(candidate)
+                return candidate
+            except ValueError:
+                continue
+
+        return default
 
     def normalize_nginx_domain(self, value: str | None, default: str | None = None) -> str | None:
         """
@@ -126,7 +188,7 @@ class HandlersNPM:
 
         method: str = self.normalize_nginx_str(data.get("method"))
         scheme: str = self.normalize_nginx_str(data.get("scheme"))
-        host: str = self.normalize_nginx_domain(data.get("host"))
+        host: str = self.normalize_nginx_domain(data.get("host"), "") or ""
         uri: str = self.normalize_nginx_str(data.get("uri"))
 
         client_ip = self.normalize_nginx_ip(data.get("client"), None)
@@ -179,24 +241,13 @@ class HandlersNPM:
         if not ip or not self.config.monitor_file_exists:
             return False
 
-        path = self.config.monitor_file_path
         try:
             ipaddress.ip_address(ip)
-            with open(path, "r", encoding="utf-8") as f:
-                list_ips = [
-                    line.strip()
-                    for line in f
-                    if line.strip() and not line.lstrip().startswith("#")
-                ]
-
         except ValueError:
             log.error("Invalid IP address: %s", ip)
             return False
 
-        except FileNotFoundError:
-            log.error("Monitoring file not found: %s", path)
-            return False
-
+        list_ips = _load_monitor_list(self.config.monitor_file_path)
         return is_ip_in_range(ip, list_ips)
 
     def _get_geoip2city(self, ip: str) -> dict[str, str | float]:

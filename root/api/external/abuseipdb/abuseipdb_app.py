@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """AbuseIPDB application interface."""
 
+import ipaddress
+
 from api.external.abuseipdb import (AbuseIPDB, AbuseIPDBConfigError,
                                     AbuseIPDBNetworkError,
                                     AbuseIPDBResponseError,
@@ -32,17 +34,47 @@ def get_abuse_instance(key: str | None = None) -> AbuseIPDB | None:
 def checking(ip: str, key: str | None = None) -> dict[str, str]:
     """ Check an IP address against AbuseIPDB and return relevant data """
     abuse = get_abuse_instance(key=key)
+    if abuse is None:
+        log.warning("AbuseIPDB: No instance available; skipping check for '%s'.", ip)
+        return {}
 
+    # If no API key is configured, the feature is simply disabled. Skip quietly
+    # instead of calling the API once per public IP and logging a warning each
+    # time (which would flood the log).
+    if not abuse.is_key_set:
+        log.debug("AbuseIPDB: No API key configured; skipping check for '%s'.", ip)
+        return {}
+
+    # Validate the IP locally without mutating the shared singleton's state.
+    # The instance is used concurrently by many writer threads, so setting
+    # abuse.ip here would race with other threads; pass the IP per-call instead.
     try:
-        abuse.ip = ip
+        ipaddress.ip_address(ip)
     except ValueError:
         log.warning("AbuseIPDB: Invalid IP address '%s' provided.", ip)
         return {}
 
     try:
-        data = abuse.api_check(force_save=True)
-    except (AbuseIPDBConfigError, AbuseIPDBNetworkError, AbuseIPDBResponseError):
-        log.warning("AbuseIPDB: Error occurred while checking IP '%s'.", ip)
+        # Do not force a disk save per IP here: writing+fsync'ing the whole cache
+        # file on every new IP (from many writer threads) is very expensive. The
+        # cache is flushed periodically from the main loop and on exit (atexit).
+        data = abuse.api_check(ip=ip)
+    except AbuseIPDBConfigError as e:
+        # Almost always a missing/empty ABUSEIP_KEY.
+        log.warning("AbuseIPDB: Configuration error checking IP '%s': %s", ip, e)
+        return {}
+    except AbuseIPDBNetworkError as e:
+        log.warning(
+            "AbuseIPDB: Network error checking IP '%s': %s", ip, e.original or e
+        )
+        return {}
+    except AbuseIPDBResponseError as e:
+        # e.g. 401 invalid key, 422 invalid IP. Surface status + API detail.
+        detail = e.api_errors[0].get("detail") if e.api_errors else str(e)
+        log.warning(
+            "AbuseIPDB: API error checking IP '%s' (status=%s): %s",
+            ip, e.status_code, detail
+        )
         return {}
 
     if data["status"] is not AbuseIPDBStatusReturn.SUCCESS:

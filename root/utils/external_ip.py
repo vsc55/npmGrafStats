@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """ Utility module to get and cache the external IP address. """
+import threading
 import time
 import urllib.error
 from typing import Optional
@@ -23,6 +24,7 @@ class ExternalIP:
         self._ip: Optional[str] = None
         self._last_update: Optional[float] = None  # epoch time
         self._ttl = ttl_seconds
+        self._lock = threading.Lock()
 
     def _detect_external_ip(self) -> Optional[str]:
         last_err: Exception | None = None
@@ -58,8 +60,12 @@ class ExternalIP:
         - If TTL has expired or force=True → fetch it.
         """
         if force or self._needs_refresh():
-            ip = self._detect_external_ip()
-            if ip is not None:
-                self._ip = ip
-                self._last_update = time.time()
+            # Serialize refreshes so concurrent callers (one per writer thread)
+            # don't all fire the network request at the TTL boundary.
+            with self._lock:
+                if force or self._needs_refresh():
+                    ip = self._detect_external_ip()
+                    if ip is not None:
+                        self._ip = ip
+                        self._last_update = time.time()
         return self._ip

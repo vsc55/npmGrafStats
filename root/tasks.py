@@ -81,66 +81,83 @@ class TasksConfig:
             try:
                 module = importlib.import_module(full_name)
 
-            except ImportError:
-                continue  # If a module from the package isspecified and it does not
-                          # exist, it is ignored.
+            except ImportError as e:
+                # If a module from the package is specified and it does not
+                # exist, it is ignored (but logged so genuine import bugs in a
+                # provider don't disappear silently).
+                log.debug("Skipping package %s: import failed: %s", package, e)
+                continue
 
-            func_discovery = getattr(module, "discovery_module", None)
-            if callable(func_discovery) is False:
-                continue  # No discovery_modules function, skip.
+            try:
+                self._discover_one(module, package, module_name, full_name)
+            except Exception:  # pylint: disable=broad-exception-caught
+                # Isolate provider failures: a single broken provider must not
+                # abort discovery (and startup) for all the others.
+                log.exception(
+                    "Error discovering provider in package %s; skipping.", package
+                )
+                continue
 
-            info_mod = func_discovery()
-            if not info_mod.get("status", True):
+    def _discover_one(
+        self, module, package: str, module_name: str, full_name: str
+    ) -> None:
+        """ Run discovery for a single already-imported provider module. """
+        func_discovery = getattr(module, "discovery_module", None)
+        if callable(func_discovery) is False:
+            return  # No discovery_modules function, skip.
+
+        info_mod = func_discovery()
+        if not info_mod.get("status", True):
+            log.warning(
+                "Skipping module %s in package %s: disabled from discovery.",
+                full_name,
+                package
+            )
+            return  # Module disabled from discovery.
+
+        # Actions to be taken by discovery.
+        actions = [
+            {
+                "state": "config",
+                "func_key": "func_config",
+                "default": "load_config_module",
+                "handler": lambda f, a, *args, **kwargs: f(
+                    kwargs["info"].get("config_name", None),
+                    self.config,
+                    force=True
+                ),
+            },
+            {
+                "state": "logtasks",
+                "func_key": "func_logtasks",
+                "default": "get_log_tasks",
+                "handler": lambda f, *args, **kwargs: self.tasks.extend(f(config=self.config)),
+            },
+        ]
+
+        for a in actions:
+            if not info_mod.get(a["state"], True):
                 log.warning(
-                    "Skipping module %s in package %s: disabled from discovery.",
+                    "Skipping %s for module %s in package %s",
+                    a["state"],
                     full_name,
                     package
                 )
-                continue  # Module disabled from discovery.
+                continue
 
-            # Actions to be taken by discovery.
-            actions = [
-                {
-                    "state": "config",
-                    "func_key": "func_config",
-                    "default": "load_config_module",
-                    "handler": lambda f, a, *args, **kwargs: f(
-                        kwargs["info"].get("config_name", None),
-                        self.config,
-                        force=True
-                    ),
-                },
-                {
-                    "state": "logtasks",
-                    "func_key": "func_logtasks",
-                    "default": "get_log_tasks",
-                    "handler": lambda f, *args, **kwargs: self.tasks.extend(f(config=self.config)),
-                },
-            ]
+            func_name = info_mod.get(a["func_key"], a["default"])
+            func = getattr(module, func_name, None)
 
-            for a in actions:
-                if not info_mod.get(a["state"], True):
-                    log.warning(
-                        "Skipping %s for module %s in package %s",
-                        a["state"],
-                        full_name,
-                        package
-                    )
-                    continue
-
-                func_name = info_mod.get(a["func_key"], a["default"])
-                func = getattr(module, func_name, None)
-
-                if callable(func):
-                    a["handler"](
-                        func,
-                        a,
-                        info=info_mod,
-                        package=package,
-                        module=module_name,
-                        func=func_name
-                    )
-                    self._log_providers.append((package, module_name, func_name))
+            if callable(func):
+                a["handler"](
+                    func,
+                    a,
+                    info=info_mod,
+                    package=package,
+                    module=module_name,
+                    func=func_name
+                )
+                self._log_providers.append((package, module_name, func_name))
 
 
     def clean(self) -> None:

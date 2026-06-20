@@ -14,18 +14,27 @@ from api.external.abuseipdb import AbuseIPDBRateLimitError
 from connector.influx import InfluxClient, InfluxRecord
 from logger import get_logger
 from tasks import LogTask, TasksConfig
+from utils import env_int
 
 log = get_logger(__name__)
 
 TAIL_POLL_INTERVAL = 0.2   # seconds between checks for new lines in follow_file
 SCAN_INTERVAL = 30.0       # seconds between scans for new log files in watch_logs
 
+# Max number of records a writer thread accumulates before flushing them to
+# InfluxDB in a single batched request (one POST instead of one per point).
+# Partial batches are also flushed whenever the queue goes momentarily idle, so
+# latency stays bounded when traffic is sparse.
+BATCH_SIZE = env_int("INFLUX_BATCH_SIZE", 500, 1)
+
 
 # Autoscaling writer thread parameters
 MIN_WRITERS = 4
 MAX_WRITERS = 48
-HIGH_Q = 100  # if exceeds this, add more writer threads
-LOW_Q = 100  # if below this, remove writer threads
+HIGH_Q = 100  # if queue exceeds this, add more writer threads
+LOW_Q = 20    # if queue is below this, remove writer threads
+# NOTE: LOW_Q must be clearly below HIGH_Q to provide a dead band (hysteresis);
+# otherwise the pool oscillates around a single threshold.
 SENTINEL = object()  # marker to signal writer threads to stop
 
 
@@ -96,6 +105,21 @@ class LogWatcherManager:
             if t.is_alive():
                 t.join()
             log.info("[STOP] Thread finished: %s (alive=%s)", t.name, t.is_alive())
+
+        # At this point all watcher/follow threads (the producers) have stopped,
+        # so no new items can be enqueued. Let the writer threads drain whatever
+        # is left in the queue and then join them, otherwise the daemon writers
+        # would be killed at interpreter exit and queued records would be lost.
+        with self._lock:
+            writers = list(self._writer_threads)
+
+        log.info("[STOP] Draining %d queued items across %d writers...",
+                 self.queue.qsize(), len(writers))
+        for t in writers:
+            if t.is_alive():
+                t.join(timeout=30.0)
+            if t.is_alive():
+                log.warning("[STOP] Writer did not finish draining in time: %s", t.name)
 
         log.info("[STOP] All threads stopped.")
         self._running = False
@@ -265,7 +289,10 @@ class LogWatcherManager:
         while not self.stop_event.is_set():
             q = self.queue.qsize()
 
+            # Always prune threads that already stopped (e.g. on a sentinel) so
+            # the writer count stays accurate regardless of scale direction.
             with self._lock:
+                self._writer_threads = [t for t in self._writer_threads if t.is_alive()]
                 n = len(self._writer_threads)
 
             # scale up
@@ -283,9 +310,6 @@ class LogWatcherManager:
 
                 # send a sentinel -> one writer will stop itself
                 self.queue.put(SENTINEL)
-                # optional: clean up dead threads
-                with self._lock:
-                    self._writer_threads = [t for t in self._writer_threads if t.is_alive()]
 
             time.sleep(1)
 
@@ -301,16 +325,38 @@ class LogWatcherManager:
         """Single writer thread that consumes records from the queue and writes to InfluxDB."""
         name = threading.current_thread().name
         log.info("[%s] Writer thread started.", name)
+
+        batch: list[InfluxRecord] = []
+
+        def flush() -> None:
+            """Write the accumulated batch in a single request and clear it."""
+            if not batch:
+                return
+            try:
+                self._cli_influx.write_points(batch)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                log.error("[%s] Influx batch write failed (%d records): %s",
+                          name, len(batch), e)
+            finally:
+                batch.clear()
+
         while not self.stop_event.is_set() or not self.queue.empty():
             try:
                 item: QueueItem = self.queue.get(timeout=0.5)
             except Empty:
+                # Idle: flush whatever we have so latency stays bounded.
+                flush()
                 continue
 
             # petición de parada para este hilo
             if item is SENTINEL:
                 self.queue.task_done()
+                # During shutdown keep draining real items instead of exiting on
+                # a stray sentinel left in the queue (would drop queued records).
+                if self.stop_event.is_set():
+                    continue
                 log.info("[%s] Writer thread stopping on sentinel.", name)
+                flush()
                 break
 
             # Validate if the item has the expected attributes
@@ -346,19 +392,7 @@ class LogWatcherManager:
 
             try:
                 records: list[InfluxRecord] = item.task.processor(item.line)
-                for rec in records:
-                    try:
-                        # TODO: Debug Speed test
-                        # print(
-                        #   f"[Influx] Writing record - Queue: {self.queue.qsize()} - Threads: {len(self._writer_threads)}",
-                        #   flush=True
-                        # )
-
-                        log.debug("[Influx] Writing record: %s", rec)
-                        self._cli_influx.write_point(rec)
-
-                    except Exception as e:  # pylint: disable=broad-exception-caught
-                        log.error("[Influx] Error writing record: %s", e)
+                batch.extend(records)
 
             except (ValueError, KeyError, AttributeError) as e:
                 # Error in data processing - log and continue
@@ -384,6 +418,13 @@ class LogWatcherManager:
 
             finally:
                 self.queue.task_done()
+
+            # Flush once we've accumulated a full batch.
+            if len(batch) >= BATCH_SIZE:
+                flush()
+
+        # Drain any records still buffered when the loop exits (shutdown).
+        flush()
 
     def _get_started_dict_for_task(self, description: str) -> dict[str, threading.Thread]:
         """Get or create the started dict for a given task description."""

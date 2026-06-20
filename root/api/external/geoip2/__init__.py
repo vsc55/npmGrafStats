@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import threading
 from dataclasses import dataclass, field
 from typing import TypedDict
 
@@ -19,6 +20,23 @@ from logger import get_logger
 from .exceptions import GeoIP2ConfigError, GeoIP2PathDBError
 
 log = get_logger(__name__)
+
+# MaxMind Reader objects are expensive to open (they mmap the DB file) and are
+# documented as thread-safe for concurrent reads, so we open one Reader per DB
+# path and reuse it across all lookups instead of reopening on every line.
+_READER_CACHE: dict[str, geoip2.database.Reader] = {}
+_READER_LOCK = threading.Lock()
+
+
+def clear_reader_cache() -> None:
+    """Close and drop all cached GeoIP2 readers (used on shutdown and in tests)."""
+    with _READER_LOCK:
+        for reader in _READER_CACHE.values():
+            try:
+                reader.close()
+            except Exception:  # pylint: disable=broad-except
+                pass
+        _READER_CACHE.clear()
 
 
 class GeoIP2CityResult(TypedDict, total=False):
@@ -150,7 +168,11 @@ class GeoIP2Client:
     @staticmethod
     def read_db(db_path: str) -> geoip2.database.Reader:
         """
-        Open a GeoIP2 database and return the reader object.
+        Return a (cached) GeoIP2 database reader for the given path.
+
+        The reader is opened once per path and reused across calls/threads, since
+        opening the DB mmaps the file and is expensive; MaxMind readers are
+        thread-safe for concurrent reads.
 
         Args:
             db_path: Path to the MaxMind DB file.
@@ -161,22 +183,34 @@ class GeoIP2Client:
         Raises:
             GeoIP2PathDBError: If the database file is not found, not accessible,
                                or not a valid MaxMind DB.
-        
+
         More info:
             https://geoip2.readthedocs.io/en/latest/#geoip2.database.Reader
         """
-        try:
-            reader_db = geoip2.database.Reader(db_path)
+        cached = _READER_CACHE.get(db_path)
+        if cached is not None:
+            return cached
+
+        with _READER_LOCK:
+            # Re-check inside the lock in case another thread just opened it.
+            cached = _READER_CACHE.get(db_path)
+            if cached is not None:
+                return cached
+
+            try:
+                reader_db = geoip2.database.Reader(db_path)
+
+            except FileNotFoundError as fnfe:
+                raise GeoIP2PathDBError("DB file not found", db_path) from fnfe
+
+            except PermissionError as pe:
+                raise GeoIP2PathDBError("DB file not accessible (forbidden)", db_path) from pe
+
+            except maxminddb.InvalidDatabaseError as ide:
+                raise GeoIP2PathDBError("DB file is not a valid MaxMind DB", db_path) from ide
+
+            _READER_CACHE[db_path] = reader_db
             return reader_db
-
-        except FileNotFoundError as fnfe:
-            raise GeoIP2PathDBError("DB file not found", db_path) from fnfe
-
-        except PermissionError as pe:
-            raise GeoIP2PathDBError("DB file not accessible (forbidden)", db_path) from pe
-
-        except maxminddb.InvalidDatabaseError as ide:
-            raise GeoIP2PathDBError("DB file is not a valid MaxMind DB", db_path) from ide
 
 
     def city(self) -> GeoIP2CityResult:
@@ -219,10 +253,6 @@ class GeoIP2Client:
         except geoip2.errors.AddressNotFoundError as ane:
             raise GeoIP2ConfigError("IP address not found in City DB", "ip", self.ip) from ane
 
-        finally:
-            if reader_db is not None:
-                reader_db.close()
-
         log.debug("[GeoIP2] City result: %s", geo_info)
         return geo_info
 
@@ -257,10 +287,6 @@ class GeoIP2Client:
 
         except geoip2.errors.AddressNotFoundError as ane:
             raise GeoIP2ConfigError("IP address not found in ASN DB", "ip", self.ip) from ane
-
-        finally:
-            if reader_db is not None:
-                reader_db.close()
 
         log.debug("[GeoIP2] ASN result: %s", asn_info)
         return asn_info

@@ -34,7 +34,18 @@ def format_time(oldtime: str) -> str | None:
     with InfluxDBClient timestamps.
     """
 
-    if oldtime is None or len(oldtime) < 26:
+    if not oldtime:
+        log.debug("Invalid time format: '%s'", oldtime)
+        return None
+
+    # Validate the whole structure instead of slicing by fixed indices, so a
+    # malformed timestamp returns None rather than a corrupt ISO string that
+    # would later crash the InfluxDB write. Locale-independent (no %b/strptime).
+    m = re.match(
+        r"^\s*(\d{2})/([A-Za-z]{3})/(\d{4}):(\d{2}):(\d{2}):(\d{2})\s*([+-]\d{4})\s*$",
+        oldtime,
+    )
+    if not m:
         log.debug("Invalid time format: '%s'", oldtime)
         return None
 
@@ -43,14 +54,13 @@ def format_time(oldtime: str) -> str | None:
         'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
         'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
     }
-    year = oldtime[7:11].strip()
-    month = month_map.get(oldtime[3:6].strip(), '01')
-    day = oldtime[0:2].strip()
-    datetime_part = oldtime[12:20].strip()
-    tz_hour = oldtime[21:24].strip()
-    tz_min = oldtime[24:26].strip()
+    day, mon, year, hh, mm, ss, tz = m.groups()
+    month = month_map.get(mon.title())
+    if month is None:
+        log.debug("Invalid month in time: '%s'", oldtime)
+        return None
 
-    newtime = f"{year}-{month}-{day}T{datetime_part}{tz_hour}:{tz_min}"
+    newtime = f"{year}-{month}-{day}T{hh}:{mm}:{ss}{tz[:3]}:{tz[3:]}"
     log.debug("Transformed time from '%s' to '%s'", oldtime, newtime)
 
     return newtime
@@ -219,10 +229,11 @@ class Regex:
     @property
     def domain(self) -> str:
         """
-        Regex pattern for domain names. 
-        E.g., example.com, sub.example.co.uk
+        Regex pattern for domain names.
+        Matches one or more labels followed by a TLD, e.g. example.com,
+        www.example.com, sub.example.co.uk, my.technology (case-insensitive).
         """
-        return r"([a-z0-9\-]*\.){1,3}?[a-z0-9\-]*\.[A-Za-z]{2,6}"
+        return r"([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}"
 
     def search(self, text: str, typeregex: TypeRegex) -> Optional[re.Match]:
         """ Search for a regex pattern in the given text. """

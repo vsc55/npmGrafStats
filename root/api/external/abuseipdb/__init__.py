@@ -7,6 +7,7 @@ import json
 import os
 import pathlib
 import sys
+import threading
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -151,8 +152,11 @@ class AbuseIPDB:
 
     @cache_data.setter
     def cache_data(self, value: dict[str, Any]) -> None:
-        """Set the cache data"""
-        self._cache_data = CacheDict(value or {})
+        """Set the cache data (mutating in place to preserve the lock-guarded
+        CacheDict identity that writer threads may be holding)."""
+        with self._io_lock:
+            self._cache_data.clear()
+            self._cache_data.update(value or {})
         self.set_cache_data_modified()
 
     _cache_expire: int | None = None
@@ -322,6 +326,13 @@ class AbuseIPDB:
         """Get the last result"""
         return self._last_result
 
+    # ----- Concurrency -----
+    # Guards cache mutations and serialization so that a save running on one
+    # thread doesn't observe the dict being mutated by writer threads.
+    _io_lock: threading.RLock = field(
+        default_factory=threading.RLock, init=False, repr=False, compare=False
+    )
+
 
     # ----- base result -----
     def _base_result(self) -> AbuseIPDBResult:
@@ -441,6 +452,11 @@ class AbuseIPDB:
             log.warning("AbuseIPDB cache data is None; cannot save cache.")
             return False
 
+        # Snapshot under the lock so concurrent writer threads can't mutate the
+        # dict while json.dump iterates it ("changed size during iteration").
+        with self._io_lock:
+            cache_data = dict(cache_data)
+
         try:
             self.mkdir_cache_path()
 
@@ -495,10 +511,11 @@ class AbuseIPDB:
             return False
 
         current_time = time.time()
-        self.cache_data[ip_address] = {
-            'timestamp': current_time,
-            'data': data
-        }
+        with self._io_lock:
+            self.cache_data[ip_address] = {
+                'timestamp': current_time,
+                'data': data
+            }
 
         if force_save:
             self.save_cache()
@@ -582,9 +599,12 @@ class AbuseIPDB:
             log.warning("AbuseIPDB cache delete requested with empty IP address")
             return False
 
-        if ip_address in self.cache_data:
-            del self.cache_data[ip_address]
+        with self._io_lock:
+            existed = ip_address in self.cache_data
+            if existed:
+                del self.cache_data[ip_address]
 
+        if existed:
             if force_save:
                 self.save_cache()
 
@@ -594,9 +614,20 @@ class AbuseIPDB:
         return True
 
     # ---- Check Method -----
-    def api_check(self, force_load: bool = False, force_save: bool = False) -> AbuseIPDBResult:
-        """ 
+    def api_check(
+        self,
+        force_load: bool = False,
+        force_save: bool = False,
+        ip: str | None = None,
+    ) -> AbuseIPDBResult:
+        """
         Check the IP address against AbuseIPDB.
+
+        Args:
+            ip: IP to check. If None, falls back to ``self.ip``. Passing it
+                explicitly avoids mutating the shared instance state, which is
+                required when a single AbuseIPDB instance is used concurrently
+                by several writer threads.
 
         Returns:
             AbuseIPDBResult: Structured result with status, codes, data and errors.
@@ -613,19 +644,20 @@ class AbuseIPDB:
         if not self.is_key_set:
             raise AbuseIPDBConfigError("AbuseIPDB API key is required")
 
-        if not self.is_ip_set:
+        target_ip = self.ip if ip is None else ip.strip()
+        if not target_ip:
             raise AbuseIPDBConfigError("IP address is required")
 
-        data_cache = self.get_from_cache(force_load=force_load)
+        data_cache = self.get_from_cache(force_load=force_load, ip_address=target_ip)
         if data_cache is not None:
-            log.debug("AbuseIPDB cache HIT for IP: %s", self.ip)
+            log.debug("AbuseIPDB cache HIT for IP: %s", target_ip)
             result: AbuseIPDBResult = self.base_result(AbuseIPDBStatusReturn.SUCCESS)
             result["status_code"] = 200
             result["data"] = data_cache
             result["errors"] = []
             return result
 
-        log.debug("AbuseIPDB cache MISS for IP: %s", self.ip)
+        log.debug("AbuseIPDB cache MISS for IP: %s", target_ip)
         response: requests.Response | None = None
         try:
             response = requests.request(
@@ -636,7 +668,7 @@ class AbuseIPDB:
                     'Key': self.key
                 },
                 params = {
-                    'ipAddress': self.ip,
+                    'ipAddress': target_ip,
                     'maxAgeInDays': str(self.max_age_in_days),
                     # Only include if verbose is True
                     **({'verbose': ''} if self.verbose else {})
@@ -647,7 +679,7 @@ class AbuseIPDB:
             # response.raise_for_status()
 
         except requests.RequestException as re:
-            log.exception("AbuseIPDB request exception for %s", self.ip)
+            log.exception("AbuseIPDB request exception for %s", target_ip)
             raise AbuseIPDBNetworkError("Network error calling AbuseIPDB", original=re) from re
 
         response_json: dict[str, Any] = {}
@@ -655,7 +687,7 @@ class AbuseIPDB:
             response_json = response.json()
 
         except json.JSONDecodeError as je:
-            log.exception("AbuseIPDB JSON decode error for %s", self.ip)
+            log.exception("AbuseIPDB JSON decode error for %s", target_ip)
             raise AbuseIPDBResponseError(
                 "Invalid JSON response from AbuseIPDB",
                 status_code=response.status_code,
@@ -672,14 +704,14 @@ class AbuseIPDB:
                 result["status_code"] = response.status_code
                 result["data"] = data
                 result["errors"] = errors
-                self.add_to_cache(data, force_save=force_save)
+                self.add_to_cache(data, ip_address=target_ip, force_save=force_save)
 
             case 429:
                 err_msg = errors[0].get("detail", "Unknown detail") if errors else "Unknown error"
                 raise AbuseIPDBRateLimitError(err_msg, response=response, api_errors=errors)
 
             case _:
-                log.error("AbuseIPDB request for %s: %s", self.ip, response.status_code)
+                log.error("AbuseIPDB request for %s: %s", target_ip, response.status_code)
                 for err in errors:
                     detail = err.get("detail", "No detail provided")
                     log.error("  [AbuseIPDB Error] %s", detail)
@@ -693,7 +725,7 @@ class AbuseIPDB:
         if not data:
             result["status"] = AbuseIPDBStatusReturn.WARNING
             result["error_message"] = "No data returned from AbuseIPDB"
-            log.warning("AbuseIPDB returned no data for %s", self.ip)
+            log.warning("AbuseIPDB returned no data for %s", target_ip)
 
         if log.isEnabledFor(LogLevel.DEBUG.value):
             debug_result = dict(result)
@@ -704,7 +736,7 @@ class AbuseIPDB:
 
             log.debug(
                 "AbuseIPDB result for %s: %s",
-                self.ip,
+                target_ip,
                 json.dumps(debug_result, indent=4, sort_keys=True)
             )
 

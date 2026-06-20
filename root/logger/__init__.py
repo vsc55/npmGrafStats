@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from dataclasses import dataclass, field
-from doctest import debug
 from enum import Enum
 from pathlib import Path
 from typing import Optional
@@ -365,14 +365,21 @@ class LogManager:
             # if (name := os.getenv("LOG_NAME")):
             #     self._name = name
 
-            if (lvl := os.getenv("LOG_LEVEL")):
-                self._level = LogManager.parse_level_from_env(lvl, "LOG_LEVEL")
+            # A typo in a LOG_*_LEVEL env var must not crash the whole process
+            # at import time; fall back to the current default and warn instead.
+            def _safe_level(var_name: str, current: LogLevel) -> LogLevel:
+                raw = os.getenv(var_name)
+                if not raw:
+                    return current
+                try:
+                    return LogManager.parse_level_from_env(raw, var_name)
+                except ValueError as exc:
+                    print(f"[logger] {exc}; using default {current.name}", file=sys.stderr)
+                    return current
 
-            if (lvl := os.getenv("LOG_CONSOLE_LEVEL")):
-                self._console_level = LogManager.parse_level_from_env(lvl, "LOG_CONSOLE_LEVEL")
-
-            if (lvl := os.getenv("LOG_FILE_LEVEL")):
-                self._file_level = LogManager.parse_level_from_env(lvl, "LOG_FILE_LEVEL")
+            self._level = _safe_level("LOG_LEVEL", self._level)
+            self._console_level = _safe_level("LOG_CONSOLE_LEVEL", self._console_level)
+            self._file_level = _safe_level("LOG_FILE_LEVEL", self._file_level)
 
             if (file := os.getenv("LOG_FILE")):
                 self._logfile = file

@@ -225,7 +225,7 @@ class NginxLogGenerator:
 
         pool: List[str] = common.copy()
 
-        if host.startswith("tienda."):
+        if host.startswith("store."):
             pool += tienda * 3
         if host.startswith("api."):
             pool += api * 4

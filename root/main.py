@@ -142,6 +142,9 @@ def run() -> int:
     try:
         while not signal_event.is_set():
             signal_event.wait(timeout=60)
+            # Periodically flush the AbuseIPDB cache to disk (only writes if it
+            # changed) so a crash doesn't lose lookups gathered since startup.
+            save_abuse_instance()
             # Simulate StopAll
             # raise KeyboardInterrupt
 

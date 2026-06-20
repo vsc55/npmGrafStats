@@ -177,30 +177,14 @@ class InfluxClient:
             log.exception("Ping to InfluxDB Exception!")
             return False
 
-    # ---------- Public API ----------
-    def write_point(self, rec: InfluxRecord) -> None:
-        """
-        Write a single point to InfluxDB.
-
-        Args:
-            rec: InfluxRecord with measurement, tags, fields, timestamp.
-
-        Raises:
-            InfluxClientConfigError: if bucket/org are not configured.
-            InfluxClientInitError: if the client or write_api are not initialized.
-        """
-        if not (self.bucket and self.org):
-            raise InfluxClientConfigError("Missing bucket/org configuration.")
-
-        self._ensure_client()
-        if self._client is None or self._write_api is None:
-            raise InfluxClientInitError("InfluxDB client not initialized.")
-
+    # ---------- Internals ----------
+    def _build_point(self, rec: InfluxRecord):
+        """Build an influxdb Point from a record, or None if it has no data."""
         tags = dict(rec.tags or {})
         fields = dict(rec.fields or {})
         if not rec.measurement or not fields:
             log.warning("Empty measurement or fields; skipping write.")
-            return
+            return None
 
         point = influxdb_client.Point(rec.measurement)
         for k, v in tags.items():
@@ -215,6 +199,34 @@ class InfluxClient:
         log.debug("write -> measurement=%s tags=%s fields=%s ts=%s",
             rec.measurement, tags, fields, rec.timestamp or 'now'
         )
+        return point
+
+    def _check_ready(self) -> None:
+        """Validate config and ensure the underlying client/write_api exist."""
+        if not (self.bucket and self.org):
+            raise InfluxClientConfigError("Missing bucket/org configuration.")
+
+        self._ensure_client()
+        if self._client is None or self._write_api is None:
+            raise InfluxClientInitError("InfluxDB client not initialized.")
+
+    # ---------- Public API ----------
+    def write_point(self, rec: InfluxRecord) -> None:
+        """
+        Write a single point to InfluxDB.
+
+        Args:
+            rec: InfluxRecord with measurement, tags, fields, timestamp.
+
+        Raises:
+            InfluxClientConfigError: if bucket/org are not configured.
+            InfluxClientInitError: if the client or write_api are not initialized.
+        """
+        self._check_ready()
+
+        point = self._build_point(rec)
+        if point is None:
+            return
 
         try:
             self._write_api.write(bucket=self.bucket, org=self.org, record=point)
@@ -227,6 +239,41 @@ class InfluxClient:
                 bucket=self.bucket,
                 original_exc=e,
             ) from e
+
+    def write_points(self, recs: list[InfluxRecord]) -> None:
+        """
+        Write several points to InfluxDB in a single batched request.
+
+        Resilient by design: individual write failures are logged, not raised,
+        and if the batch request fails the points are retried one by one so a
+        single bad point does not drop the whole batch.
+
+        Raises:
+            InfluxClientConfigError: if bucket/org are not configured.
+            InfluxClientInitError: if the client or write_api are not initialized.
+        """
+        self._check_ready()
+
+        points = [p for p in (self._build_point(r) for r in recs) if p is not None]
+        if not points:
+            return
+
+        try:
+            self._write_api.write(bucket=self.bucket, org=self.org, record=points)
+            return
+
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            log.warning(
+                "Batch write of %d points failed (%s); retrying individually.",
+                len(points), e
+            )
+
+        # Poison-pill fallback: isolate the bad point(s) and salvage the rest.
+        for point in points:
+            try:
+                self._write_api.write(bucket=self.bucket, org=self.org, record=point)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                log.error("Dropping point after individual write failure: %s", e)
 
     def close(self) -> None:
         """Close the underlying client."""
